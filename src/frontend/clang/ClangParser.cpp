@@ -7,6 +7,8 @@
 #include "cverifier/LLIRFactory.h"
 #include "cverifier/Utils.h"
 #include "llvm/Support/raw_ostream.h"
+#include <fstream>
+#include <iterator>
 
 #ifdef HAVE_LLVM
 
@@ -705,50 +707,37 @@ LLIRModule* ClangParser::parseFile(
     // 创建 LLIR 模块
     auto* module = core::LLIRFactory::createModule(filename);
 
-    // 准备编译参数
-    std::vector<std::string> args;
-    args.push_back("cverifier");
-    args.push_back(filename);
-
-    // 添加编译参数
-    for (const auto& arg : compileArgs) {
-        args.push_back(arg);
-    }
-
-    // 添加默认参数
-    args.push_back("-I/usr/include");
-    args.push_back("-I/usr/local/include");
-
-    // 运行 Clang 工具
-    // 在 LLVM 15+ 中，使用新的 API
-    llvm::Expected<clang::tooling::CommonOptionsParser> optParser =
-        clang::tooling::CommonOptionsParser::create(
-            args.size(),
-            const_cast<char**>(args.data()),
-            clang::tooling::CommonOptionsParser::HelpMessage
-        );
-
-    if (!optParser) {
-        lastError_ = "Failed to create options parser";
+    // 读取源文件内容
+    std::ifstream file(filename);
+    if (!file.is_open()) {
+        lastError_ = "Failed to open file: " + filename;
         utils::Logger::error(lastError_);
         delete module;
         return nullptr;
     }
 
-    clang::tooling::ClangTool tool(optParser->getCompilations(),
-                                   optParser->getSourcePathList());
+    std::string code((std::istreambuf_iterator<char>(file)),
+                      std::istreambuf_iterator<char>());
+    file.close();
 
-    // 使用 lambda 工厂创建 FrontendAction
-    int result = tool.run(
-        clang::tooling::newFrontendActionFactory(
-            [module]() -> std::unique_ptr<clang::FrontendAction> {
-                return std::make_unique<CVerifierFrontendAction>(module);
-            }
-        ).get()
+    // 准备编译参数
+    std::vector<std::string> args = compileArgs;
+    args.push_back("-I/usr/include");
+    args.push_back("-I/usr/local/include");
+
+    // 创建前端动作
+    auto action = std::make_unique<CVerifierFrontendAction>(module);
+
+    // 使用 clang::tooling::runToolOnCode 运行
+    bool success = clang::tooling::runToolOnCode(
+        std::move(action),
+        code,
+        filename,
+        args
     );
 
-    if (result != 0) {
-        lastError_ = "Clang tool execution failed";
+    if (!success) {
+        lastError_ = "Failed to parse code";
         utils::Logger::error(lastError_);
         delete module;
         return nullptr;
