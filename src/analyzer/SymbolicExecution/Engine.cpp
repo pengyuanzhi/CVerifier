@@ -163,23 +163,6 @@ void SymbolicExecutionEngine::explore() {
             break;
         }
 
-        // 从工作列表中取出一个状态
-        ExplorationState* explorationState = worklist_.front();
-        worklist_.pop();
-
-        SymbolicState* state = explorationState->symbolicState;
-        CFGNode* node = explorationState->currentNode;
-
-        utils::Logger::debug("Processing node: " + node->getId());
-
-        // 路径剪枝检查
-        if (config_.enablePathPruning && shouldPrunePath(state)) {
-            utils::Logger::debug("Path pruned, skipping state");
-            delete state;
-            delete explorationState;
-            continue;
-        }
-
         // 执行基本块
         executeBasicBlock(
             state,
