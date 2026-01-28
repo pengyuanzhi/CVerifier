@@ -8,6 +8,7 @@
 #include <queue>
 #include <stack>
 #include <sstream>
+#include <functional>
 
 namespace cverifier {
 namespace core {
