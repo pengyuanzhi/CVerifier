@@ -63,20 +63,18 @@ void printVersion() {
  * @brief 创建示例LLIR模块用于演示
  */
 LLIRModule* createExampleModule() {
-    using namespace factory;
-
     // 创建模块
-    auto* module = createModule("example");
+    auto* module = LLIRFactory::createModule("example");
 
     // 创建函数
-    auto* func = createFunction("test_function");
+    auto* func = LLIRFactory::createFunction("test_function");
     module->addFunction(func);
 
     // 创建基本块
-    auto* entry = createBasicBlock("entry");
-    auto* then = createBasicBlock("then");
-    auto* else_ = createBasicBlock("else");
-    auto* merge = createBasicBlock("merge");
+    auto* entry = LLIRFactory::createBasicBlock("entry");
+    auto* then = LLIRFactory::createBasicBlock("then");
+    auto* else_ = LLIRFactory::createBasicBlock("else");
+    auto* merge = LLIRFactory::createBasicBlock("merge");
 
     func->addBasicBlock(entry);
     func->addBasicBlock(then);
@@ -84,20 +82,24 @@ LLIRModule* createExampleModule() {
     func->addBasicBlock(merge);
     func->setEntryBlock(entry);
 
+    // 创建常量
+    auto* const_10 = LLIRFactory::createIntConstant(10);
+    auto* const_5 = LLIRFactory::createIntConstant(5);
+    auto* const_0 = LLIRFactory::createIntConstant(0);
+
     // 创建一些指令
-    auto* alloca = createAlloca(createIntConstant(10));
+    auto* alloca = LLIRFactory::createAlloca(const_10);
     entry->addInstruction(alloca);
 
-    auto* var_x = createVariable("x", ValueType::Integer, 0);
-    auto* const_5 = createIntConstant(5);
-    auto* add = createAdd(var_x, const_5);
+    auto* var_x = LLIRFactory::createVariable("x", ValueType::Integer, 0);
+    auto* add = LLIRFactory::createAdd(var_x, const_5);
     entry->addInstruction(add);
 
-    auto* br = createBr(merge);
+    auto* br = LLIRFactory::createBr(merge);
     entry->addInstruction(br);
 
     // 返回指令
-    auto* ret = createRet(createIntConstant(0));
+    auto* ret = LLIRFactory::createRet(const_0);
     merge->addInstruction(ret);
 
     // 建立CFG连接
