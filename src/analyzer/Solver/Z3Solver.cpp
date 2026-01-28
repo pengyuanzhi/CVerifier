@@ -22,9 +22,9 @@ Z3Solver::Z3Solver()
     , timeout_(5000) {
 #ifdef HAVE_Z3
     // 设置超时（使用 Z3_params）
-    Z3_params params = Z3_mk_params(ctx_, Z3_mk_params_ref(ctx_));
-    Z3_params_set_uint(ctx_, params, Z3_mk_string_symbol(ctx_, "timeout"),
-                       static_cast<unsigned>(timeout_));
+    Z3_params params = Z3_mk_params(ctx_);
+    Z3_symbol symbol = Z3_mk_string_symbol(ctx_, "timeout");
+    Z3_params_set_uint(ctx_, params, symbol, static_cast<unsigned>(timeout_));
     Z3_solver_set_params(ctx_, solver_, params);
     Z3_params_dec_ref(ctx_, params);
 
