@@ -292,6 +292,9 @@ int main(int argc, char* argv[]) {
     // 运行演示模式
     if (runDemo) {
         utils::Logger::info("Running in demo mode...");
+        // Demo 模式自动启用详细日志
+        utils::Logger::setLevel(utils::Logger::Level::Debug);
+        utils::Logger::info("Debug logging enabled for demo mode");
         runDemoAnalysis();
         return 0;
     }

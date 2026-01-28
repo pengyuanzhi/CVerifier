@@ -186,12 +186,31 @@ void SymbolicExecutionEngine::executeBasicBlock(
     CFGNode* node,
     int startInstIndex
 ) {
+    if (!state || !node) {
+        utils::Logger::error("Null state or node in executeBasicBlock");
+        return;
+    }
+
     LLIRBasicBlock* bb = node->getBasicBlock();
+    if (!bb) {
+        utils::Logger::error("Null basic block in node: " + node->getId());
+        return;
+    }
+
     const auto& instructions = bb->getInstructions();
+
+    utils::Logger::debug("Executing " + std::to_string(instructions.size()) + " instructions in block: " + node->getId());
 
     // 从指定索引开始执行指令
     for (size_t i = startInstIndex; i < instructions.size(); ++i) {
         LLIRInstruction* inst = instructions[i];
+
+        if (!inst) {
+            utils::Logger::warning("Null instruction at index " + std::to_string(i));
+            continue;
+        }
+
+        utils::Logger::debug("Executing instruction at index " + std::to_string(i));
 
         // 执行指令
         executeInstruction(state, inst, node, static_cast<int>(i));
@@ -377,9 +396,24 @@ SymbolicState* SymbolicExecutionEngine::mergeStates(
 }
 
 bool SymbolicExecutionEngine::shouldPrunePath(SymbolicState* state) {
+    if (!state) {
+        utils::Logger::warning("Null state in shouldPrunePath");
+        return false;
+    }
+
+    auto* pathConstraint = state->getPathConstraint();
+    if (!pathConstraint) {
+        utils::Logger::warning("Null path constraint in state");
+        return false;
+    }
+
     // 简化实现：检查路径约束是否可满足
     // 实际实现中需要调用SMT求解器
-    return !state->getPathConstraint()->isSatisfiable();
+    // 目前总是返回 false（不剪枝）
+    return false;
+
+    // TODO: 启用路径剪枝（需要修复 Z3Solver 问题）
+    // return !pathConstraint->isSatisfiable();
 }
 
 std::string SymbolicExecutionEngine::freshVarName() {
