@@ -1,0 +1,176 @@
+# CVerifier 默认配置文件
+# 适用于大多数场景的平衡配置
+
+analysis:
+  # 分析超时时间（秒）
+  timeout: 300
+
+  # 最大探索深度
+  max-depth: 100
+
+  # 最大状态数（防止状态空间爆炸）
+  max-states: 10000
+
+  # 并行线程数（0表示自动检测）
+  parallel-threads: 4
+
+  # 路径探索配置
+  path-exploration:
+    # 探索策略: dfs, bfs, random, hybrid
+    strategy: hybrid
+
+    # 是否合并相似状态
+    merge-similar-states: true
+
+    # 状态相似度阈值（0.0-1.0）
+    similarity-threshold: 0.8
+
+  # 抽象解释配置
+  abstraction:
+    # 是否启用抽象解释
+    enabled: true
+
+    # 抽象域类型: constant, interval, octagon, polyhedra
+    domain: interval
+
+    # Widening 间隔（迭代次数）
+    widening-interval: 3
+
+    # 是否启用抽象剪枝
+    pruning-enabled: true
+
+  # 符号执行配置
+  symbolic-execution:
+    # 每条路径的超时时间（秒）
+    timeout-per-path: 10
+
+    # 是否启用约束缓存
+    constraint-cache: true
+
+    # 是否启用增量求解
+    incremental-solving: true
+
+# 漏洞检测器配置
+checkers:
+  # 启用的检查器列表
+  enable:
+    - buffer-overflow
+    - null-pointer
+    - memory-leak
+    - integer-overflow
+
+  # 禁用的检查器列表
+  disable: []
+
+  # 缓冲区溢出检查器配置
+  buffer-overflow:
+    # 检查堆溢出
+    check-heap: true
+
+    # 检查栈溢出
+    check-stack: true
+
+    # 检查静态数组溢出
+    check-static: true
+
+    # 检查字符串函数（strcpy, sprintf等）
+    check-string-functions: true
+
+    # 是否激进模式（可能增加误报）
+    aggressive: false
+
+  # 空指针解引用检查器配置
+  null-pointer:
+    # 是否激进模式（检查所有可能的解引用）
+    aggressive: true
+
+    # 是否跟踪外部函数的返回值
+    track-external-functions: true
+
+  # 内存泄漏检查器配置
+  memory-leak:
+    # 是否跟踪所有分配（包括标准库）
+    track-all-allocations: true
+
+    # 是否忽略在程序退出时未释放的内存
+    ignore-exit-leaks: false
+
+    # 最小报告泄漏大小（字节）
+    min-leak-size: 1
+
+  # 整数溢出检查器配置
+  integer-overflow:
+    # 检查有符号溢出
+    check-signed: true
+
+    # 检查无符号溢出
+    check-unsigned: true
+
+    # 检查截断（窄转换）
+    check-truncation: true
+
+# SMT 求解器配置
+solver:
+  # 求解器后端: z3, cvc5
+  backend: z3
+
+  # 求解超时时间（秒）
+  timeout: 10
+
+  # 是否验证模型
+  model-validation: true
+
+  # 内存限制（MB，0表示无限制）
+  memory-limit: 0
+
+# 报告配置
+reporting:
+  # 报告格式: console, sarif, json
+  format: console
+
+  # 严重程度过滤: low, medium, high, critical
+  severity-level:
+    - low
+    - medium
+    - high
+    - critical
+
+  # 是否包含错误轨迹
+  include-trace: true
+
+  # 是否包含源代码片段
+  include-source-snippet: true
+
+  # 源代码片段上下文行数
+  context-lines: 3
+
+  # 是否包含修复建议
+  include-fix-suggestions: true
+
+  # 输出文件路径（可选）
+  # output-file: "report.sarif"
+
+# 日志配置
+logging:
+  # 日志级别: trace, debug, info, warning, error, fatal
+  level: info
+
+  # 是否输出到控制台
+  console: true
+
+  # 日志文件路径（可选）
+  # file: "cverifier.log"
+
+  # 是否彩色输出
+  color: true
+
+# 外部函数建模
+external-functions:
+  # 是否使用标准库模型
+  use-standard-models: true
+
+  # 自定义模型文件路径
+  # custom-models: "models/custom_functions.yaml"
+
+  # 未知函数的处理策略: skip, assume-valid, assume-unsafe
+  unknown-function-strategy: skip

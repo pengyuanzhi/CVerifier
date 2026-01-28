@@ -1,0 +1,101 @@
+# CVerifier 激进分析配置
+# 适用于深度分析和容忍误报的场景
+
+analysis:
+  # 长超时时间
+  timeout: 1800  # 30分钟
+
+  # 深度探索
+  max-depth: 500
+
+  # 大状态数
+  max-states: 100000
+
+  # 多线程并行
+  parallel-threads: 8
+
+  path-exploration:
+    # 使用 DFS 深度探索
+    strategy: dfs
+
+    # 合并相似状态
+    merge-similar-states: true
+
+    # 较高的相似度阈值（更少合并）
+    similarity-threshold: 0.9
+
+  abstraction:
+    enabled: true
+
+    # 使用精确的多面体域
+    domain: polyhedra
+
+    # 较少应用 widening（保持精度）
+    widening-interval: 10
+
+    pruning-enabled: true
+
+  symbolic-execution:
+    # 每条路径的长超时
+    timeout-per-path: 30
+
+    constraint-cache: true
+    incremental-solving: true
+
+checkers:
+  enable:
+    - buffer-overflow
+    - null-pointer
+    - memory-leak
+    - integer-overflow
+    - use-after-free
+    - double-free
+
+  buffer-overflow:
+    check-heap: true
+    check-stack: true
+    check-static: true
+    check-string-functions: true
+    aggressive: true  # 激进模式
+
+  null-pointer:
+    aggressive: true  # 检查所有可能的解引用
+    track-external-functions: true
+
+  memory-leak:
+    track-all-allocations: true
+    ignore-exit-leaks: false
+    min-leak-size: 0  # 报告所有泄漏
+
+  integer-overflow:
+    check-signed: true
+    check-unsigned: true
+    check-truncation: true
+
+solver:
+  backend: z3
+  timeout: 30  # 长超时
+  model-validation: true
+  memory-limit: 4096  # 4GB
+
+reporting:
+  format: sarif  # IDE 友好格式
+  severity-level:
+    - low
+    - medium
+    - high
+    - critical
+  include-trace: true
+  include-source-snippet: true
+  include-fix-suggestions: true
+  context-lines: 5
+
+logging:
+  level: debug  # 详细日志
+  console: true
+  # file: "cverifier_debug.log"
+  color: true
+
+external-functions:
+  use-standard-models: true
+  unknown-function-strategy: assume-unsafe  # 保守假设
