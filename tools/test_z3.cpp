@@ -213,7 +213,9 @@ int main(int argc, char* argv[]) {
     utils::Logger::setLevel(utils::Logger::Level::Info);
 
 #ifdef HAVE_Z3
-    std::cout << "Z3 Version: " << Z3_get_version() << std::endl;
+    unsigned int major, minor, build, revision;
+    Z3_get_version(&major, &minor, &build, &revision);
+    std::cout << "Z3 Version: " << major << "." << minor << "." << build << "." << revision << std::endl;
     std::cout << std::endl;
 #else
     std::cout << "Z3: Not Available (tests will use simplified implementation)" << std::endl;

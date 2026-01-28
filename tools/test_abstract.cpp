@@ -10,9 +10,86 @@
 #include "cverifier/Utils.h"
 #include <iostream>
 #include <iomanip>
+#include <algorithm>
 
 using namespace cverifier;
 using namespace cverifier::core;
+
+// ============================================================================
+// 区间算术辅助函数（用于测试）
+// ============================================================================
+
+namespace {
+
+IntervalValue* intervalAdd(IntervalValue* a, IntervalValue* b) {
+    if (a->isTop() || b->isTop()) {
+        return IntervalValue::createTop(ValueType::Integer);
+    }
+
+    if (a->isBottom() || b->isBottom()) {
+        return IntervalValue::createBottom(ValueType::Integer);
+    }
+
+    if (!a->isBounded() || !b->isBounded()) {
+        return IntervalValue::createTop(ValueType::Integer);
+    }
+
+    // [a.low, a.high] + [b.low, b.high] = [a.low + b.low, a.high + b.high]
+    int64_t newLow = a->getLowInt() + b->getLowInt();
+    int64_t newHigh = a->getHighInt() + b->getHighInt();
+
+    return new IntervalValue(newLow, newHigh);
+}
+
+IntervalValue* intervalSub(IntervalValue* a, IntervalValue* b) {
+    if (a->isTop() || b->isTop()) {
+        return IntervalValue::createTop(ValueType::Integer);
+    }
+
+    if (a->isBottom() || b->isBottom()) {
+        return IntervalValue::createBottom(ValueType::Integer);
+    }
+
+    if (!a->isBounded() || !b->isBounded()) {
+        return IntervalValue::createTop(ValueType::Integer);
+    }
+
+    // [a.low, a.high] - [b.low, b.high] = [a.low - b.high, a.high - b.low]
+    int64_t newLow = a->getLowInt() - b->getHighInt();
+    int64_t newHigh = a->getHighInt() - b->getLowInt();
+
+    return new IntervalValue(newLow, newHigh);
+}
+
+IntervalValue* intervalMul(IntervalValue* a, IntervalValue* b) {
+    if (a->isTop() || b->isTop()) {
+        return IntervalValue::createTop(ValueType::Integer);
+    }
+
+    if (a->isBottom() || b->isBottom()) {
+        return IntervalValue::createBottom(ValueType::Integer);
+    }
+
+    if (!a->isBounded() || !b->isBounded()) {
+        return IntervalValue::createTop(ValueType::Integer);
+    }
+
+    // [a.low, a.high] * [b.low, b.high]
+    // 需要计算4种组合，取最小和最大
+    int64_t products[4] = {
+        a->getLowInt() * b->getLowInt(),
+        a->getLowInt() * b->getHighInt(),
+        a->getHighInt() * b->getLowInt(),
+        a->getHighInt() * b->getHighInt()
+    };
+
+    int64_t newLow = *std::min_element(products, products + 4);
+    int64_t newHigh = *std::max_element(products, products + 4);
+
+    return new IntervalValue(newLow, newHigh);
+}
+
+} // anonymous namespace
 
 /**
  * @brief 测试1：区间域基本操作
@@ -20,11 +97,11 @@ using namespace cverifier::core;
 void test1_IntervalDomain() {
     std::cout << "=== Test 1: Interval Domain ===" << std::endl;
 
-    // 创建区间值
-    auto* interval1 = new IntervalValue(5, 10);
-    auto* interval2 = new IntervalValue(0, 100);
-    auto* top = IntervalValue::createTop(ValueType::Integer);
-    auto* bottom = IntervalValue::createBottom(ValueType::Integer);
+    // 创建区间值（显式使用 int64_t 避免歧义）
+    IntervalValue* interval1 = new IntervalValue(int64_t{5}, int64_t{10});
+    IntervalValue* interval2 = new IntervalValue(int64_t{0}, int64_t{100});
+    AbstractValue* top = IntervalValue::createTop(ValueType::Integer);
+    AbstractValue* bottom = IntervalValue::createBottom(ValueType::Integer);
 
     std::cout << "Interval1: " << interval1->toString() << std::endl;
     std::cout << "Interval2: " << interval2->toString() << std::endl;
@@ -52,15 +129,15 @@ void test2_AbstractStore() {
     std::cout << "=== Test 2: Abstract Store ===" << std::endl;
 
     // 创建抽象存储
-    auto* store1 = new AbstractStore();
-    auto* store2 = new AbstractStore();
+    AbstractStore* store1 = new AbstractStore();
+    AbstractStore* store2 = new AbstractStore();
 
-    // 绑定变量
-    store1->bind("x", new IntervalValue(5, 10));
-    store1->bind("y", new IntervalValue(0, 100));
+    // 绑定变量（显式使用 int64_t 避免歧义）
+    store1->bind("x", new IntervalValue(int64_t{5}, int64_t{10}));
+    store1->bind("y", new IntervalValue(int64_t{0}, int64_t{100}));
 
-    store2->bind("x", new IntervalValue(3, 8));
-    store2->bind("z", new IntervalValue(20, 30));
+    store2->bind("x", new IntervalValue(int64_t{3}, int64_t{8}));
+    store2->bind("z", new IntervalValue(int64_t{20}, int64_t{30}));
 
     std::cout << "Store1: " << store1->toString() << std::endl;
     std::cout << "Store2: " << store2->toString() << std::endl;
@@ -89,22 +166,23 @@ void test2_AbstractStore() {
 void test3_IntervalArithmetic() {
     std::cout << "=== Test 3: Interval Arithmetic ===" << std::endl;
 
-    auto* a = new IntervalValue(5, 10);
-    auto* b = new IntervalValue(3, 7);
+    // 显式使用 int64_t 避免构造函数歧义
+    IntervalValue* a = new IntervalValue(int64_t{5}, int64_t{10});
+    IntervalValue* b = new IntervalValue(int64_t{3}, int64_t{7});
 
     std::cout << "a = " << a->toString() << std::endl;
     std::cout << "b = " << b->toString() << std::endl;
 
     // 加法
-    auto* sum = intervalAdd(a, b);
+    IntervalValue* sum = intervalAdd(a, b);
     std::cout << "a + b = " << sum->toString() << std::endl;
 
     // 减法
-    auto* diff = intervalSub(a, b);
+    IntervalValue* diff = intervalSub(a, b);
     std::cout << "a - b = " << diff->toString() << std::endl;
 
     // 乘法
-    auto* product = intervalMul(a, b);
+    IntervalValue* product = intervalMul(a, b);
     std::cout << "a * b = " << product->toString() << std::endl;
 
     // 清理

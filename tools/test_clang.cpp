@@ -12,6 +12,7 @@
 
 using namespace cverifier;
 using namespace cverifier::frontend;
+using namespace cverifier::core;
 
 /**
  * @brief 测试1：解析简单的C代码
