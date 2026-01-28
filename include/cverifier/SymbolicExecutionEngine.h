@@ -237,7 +237,7 @@ private:
     int exploredPaths_;
     int foundVulnerabilities_;
     int varCounter_;
-    double startTime_;
+    utils::Timer startTimer_;
 };
 
 // ============================================================================

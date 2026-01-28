@@ -24,7 +24,8 @@ SymbolicExecutionEngine::SymbolicExecutionEngine(
     exploredPaths_(0),
     foundVulnerabilities_(0),
     varCounter_(0) {
-    startTime_ = utils::Timer().elapsedSec();
+    // 记录开始时间点
+    startTimer_ = utils::Timer();
 }
 
 SymbolicExecutionEngine::~SymbolicExecutionEngine() {
@@ -149,7 +150,7 @@ void SymbolicExecutionEngine::explore() {
         }
 
         // 检查超时
-        double elapsed = utils::Timer().elapsedSec() - startTime_;
+        double elapsed = startTimer_.elapsedSec();
         if (elapsed > config_.timeout) {
             utils::Logger::warning("Symbolic execution timeout");
             delete state;
@@ -428,7 +429,7 @@ std::string SymbolicExecutionEngine::getStatistics() const {
     oss << "  Reached States: " << reachedStates_.size() << "\n";
     oss << "  Found Vulnerabilities: " << foundVulnerabilities_ << "\n";
 
-    double elapsed = utils::Timer().elapsedSec() - startTime_;
+    double elapsed = startTimer_.elapsedSec();
     oss << "  Elapsed Time: " << std::fixed << elapsed << "s\n";
 
     return oss.str();
