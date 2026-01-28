@@ -17,15 +17,16 @@ namespace core {
 
 Z3Solver::Z3Solver()
 #ifdef HAVE_Z3
-    : ctx_(z3::config()), solver_(ctx_, "QF_LIA")
+    : ctx_(), solver_(ctx_, "QF_LIA")
 #endif
     , timeout_(5000) {
 #ifdef HAVE_Z3
-    // 设置超时
-    if (timeout_ > 0) {
-        Z3_set_param_value(Z3_solver_get_params(ctx_, solver_), "timeout",
-                           std::to_string(timeout_).c_str());
-    }
+    // 设置超时（使用 Z3_params）
+    Z3_params params = Z3_mk_params(ctx_, Z3_mk_params_ref(ctx_));
+    Z3_params_set_uint(ctx_, params, Z3_mk_string_symbol(ctx_, "timeout"),
+                       static_cast<unsigned>(timeout_));
+    Z3_solver_set_params(ctx_, solver_, params);
+    Z3_params_dec_ref(ctx_, params);
 
     utils::Logger::debug("Z3 solver initialized successfully");
 #else
