@@ -43,20 +43,13 @@ LLIRFunction* ASTToLLIRConverter::convertFunctionDecl(clang::FunctionDecl* funcD
     // 转换函数参数
     int paramIndex = 0;
     for (auto* param : funcDecl->parameters()) {
-        std::string paramName = param->getName().getAsString();
+        std::string paramName = param->getName().str();
         if (paramName.empty()) {
             paramName = "param_" + std::to_string(paramIndex);
         }
 
         // 记录参数映射
         varMap_[param] = paramName;
-
-        // 创建 LLIR 参数（实际在LLIR中用变量表示）
-        auto* paramVar = core::LLIRFactory::createVariable(
-            paramName,
-            convertType(param->getType()),
-            paramIndex
-        );
 
         paramIndex++;
     }
@@ -202,7 +195,7 @@ LLIRValue* ASTToLLIRConverter::convertExpr(clang::Expr* expr) {
                 );
             } else {
                 // 创建新的变量引用
-                std::string varName = varDecl->getName().getAsString();
+                std::string varName = varDecl->getName().str();
                 if (varName.empty()) {
                     varName = freshVarName("anon");
                 }
@@ -445,7 +438,7 @@ void ASTToLLIRConverter::convertVarDecl(clang::VarDecl* varDecl) {
         return;
     }
 
-    std::string varName = varDecl->getName().getAsString();
+    std::string varName = varDecl->getName().str();
     if (varName.empty()) {
         varName = freshVarName("anon");
     }
