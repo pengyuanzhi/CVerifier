@@ -6,6 +6,8 @@
 #include <sstream>
 #include <iomanip>
 #include <random>
+#include <iostream>
+#include <chrono>
 
 namespace cverifier {
 namespace utils {
@@ -241,19 +243,19 @@ public:
     }
 
     static void debug(const std::string& message) {
-        log(Level::Debug, message);
+        instance().log(Level::Debug, message);
     }
 
     static void info(const std::string& message) {
-        log(Level::Info, message);
+        instance().log(Level::Info, message);
     }
 
     static void warning(const std::string& message) {
-        log(Level::Warning, message);
+        instance().log(Level::Warning, message);
     }
 
     static void error(const std::string& message) {
-        log(Level::Error, message);
+        instance().log(Level::Error, message);
     }
 
 private:
