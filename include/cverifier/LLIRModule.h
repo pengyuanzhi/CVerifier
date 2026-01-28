@@ -99,6 +99,11 @@ public:
 
     std::string toString() const override;
 
+    ValueType getValueType() const override {
+        // 指令没有值类型，返回Void
+        return ValueType::Void;
+    }
+
 private:
     LLIRInstructionType type_;
     SourceLocation location_;

@@ -78,29 +78,28 @@ endif()
 # ============================================================================
 # 前端库（仅在找到LLVM时构建）
 # ============================================================================
-# TODO: Clang前端暂时禁用，需要完善LLIRInstruction的实现
-# if(LLVM_FOUND)
-#     if(EXISTS ${CMAKE_SOURCE_DIR}/src/frontend/clang/ClangParser.cpp)
-#         add_library(cverifier-frontend
-#             src/frontend/clang/ClangParser.cpp
-#         )
-#
-#         target_link_libraries(cverifier-frontend PUBLIC
-#             cverifier-core
-#             ${LLVM_LIBS}
-#             clangFrontend
-#             clangTooling
-#             clangAST
-#         )
-#
-#         target_include_directories(cverifier-frontend PUBLIC
-#             ${CMAKE_SOURCE_DIR}/include
-#             ${LLVM_INCLUDE_DIRS}
-#         )
-#
-#         target_compile_definitions(cverifier-frontend PUBLIC HAVE_LLVM)
-#     endif()
-# endif()
+if(LLVM_FOUND)
+    if(EXISTS ${CMAKE_SOURCE_DIR}/src/frontend/clang/ClangParser.cpp)
+        add_library(cverifier-frontend
+            src/frontend/clang/ClangParser.cpp
+        )
+
+        target_link_libraries(cverifier-frontend PUBLIC
+            cverifier-core
+            ${LLVM_LIBS}
+            clangFrontend
+            clangTooling
+            clangAST
+        )
+
+        target_include_directories(cverifier-frontend PUBLIC
+            ${CMAKE_SOURCE_DIR}/include
+            ${LLVM_INCLUDE_DIRS}
+        )
+
+        target_compile_definitions(cverifier-frontend PUBLIC HAVE_LLVM)
+    endif()
+endif()
 
 # ============================================================================
 # 分析器库
@@ -227,40 +226,39 @@ if(EXISTS ${CMAKE_SOURCE_DIR}/tools/test_z3.cpp)
 endif()
 
 # ============================================================================
-# Clang前端测试程序（暂时禁用）
+# Clang前端测试程序
 # ============================================================================
-# TODO: 需要先完善LLIRInstruction的实现
-# if(LLVM_FOUND AND EXISTS ${CMAKE_SOURCE_DIR}/tools/test_clang.cpp)
-#     add_executable(test_clang
-#         tools/test_clang.cpp
-#     )
-#
-#     target_link_libraries(test_clang PRIVATE
-#         cverifier-core
-#         cverifier-analyzer
-#         cverifier-frontend
-#     )
-#
-#     if(Z3_FOUND)
-#         target_link_libraries(test_clang PRIVATE ${Z3_LIBRARIES})
-#         target_compile_definitions(test_clang PRIVATE HAVE_Z3)
-#         target_include_directories(test_clang PRIVATE ${Z3_INCLUDE_DIRS})
-#     endif()
-#
-#     target_link_libraries(test_clang PRIVATE
-#         ${LLVM_LIBS}
-#         clangFrontend
-#         clangTooling
-#         clangAST
-#     )
-#
-#     target_compile_definitions(test_clang PRIVATE HAVE_LLVM)
-#
-#     target_include_directories(test_clang PRIVATE
-#         ${CMAKE_SOURCE_DIR}/include
-#         ${LLVM_INCLUDE_DIRS}
-#     )
-# endif()
+if(LLVM_FOUND AND EXISTS ${CMAKE_SOURCE_DIR}/tools/test_clang.cpp)
+    add_executable(test_clang
+        tools/test_clang.cpp
+    )
+
+    target_link_libraries(test_clang PRIVATE
+        cverifier-core
+        cverifier-analyzer
+        cverifier-frontend
+    )
+
+    if(Z3_FOUND)
+        target_link_libraries(test_clang PRIVATE ${Z3_LIBRARIES})
+        target_compile_definitions(test_clang PRIVATE HAVE_Z3)
+        target_include_directories(test_clang PRIVATE ${Z3_INCLUDE_DIRS})
+    endif()
+
+    target_link_libraries(test_clang PRIVATE
+        ${LLVM_LIBS}
+        clangFrontend
+        clangTooling
+        clangAST
+    )
+
+    target_compile_definitions(test_clang PRIVATE HAVE_LLVM)
+
+    target_include_directories(test_clang PRIVATE
+        ${CMAKE_SOURCE_DIR}/include
+        ${LLVM_INCLUDE_DIRS}
+    )
+endif()
 
 # ============================================================================
 # 抽象解释测试程序
