@@ -1,5 +1,5 @@
 cmake_minimum_required(VERSION 3.20)
-project(CVerifier VERSION 0.1.0 LANGUAGES CXX)
+project(CVerifier VERSION 0.1.0 LANGUAGES C CXX)
 
 # 设置C++标准
 set(CMAKE_CXX_STANDARD 17)
@@ -142,22 +142,22 @@ if(Z3_FOUND)
 endif()
 
 # ============================================================================
-# 报告生成库
+# 报告生成库（TODO: 待实现）
 # ============================================================================
-add_library(cverifier-report
-    src/report/ReportGenerator.cpp
-    src/report/ErrorTrace.cpp
-    src/report/ConsoleReporter.cpp
-    src/report/SarifExporter.cpp
-)
-
-target_link_libraries(cverifier-report PUBLIC
-    cverifier-core
-)
-
-target_include_directories(cverifier-report PUBLIC
-    ${CMAKE_SOURCE_DIR}/include
-)
+# add_library(cverifier-report
+#     src/report/ReportGenerator.cpp
+#     src/report/ErrorTrace.cpp
+#     src/report/ConsoleReporter.cpp
+#     src/report/SarifExporter.cpp
+# )
+#
+# target_link_libraries(cverifier-report PUBLIC
+#     cverifier-core
+# )
+#
+# target_include_directories(cverifier-report PUBLIC
+#     ${CMAKE_SOURCE_DIR}/include
+# )
 
 # ============================================================================
 # 主程序
