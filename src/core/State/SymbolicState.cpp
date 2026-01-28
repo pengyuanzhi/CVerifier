@@ -74,8 +74,30 @@ std::string UnaryOpExpr::toString() const {
 std::unique_ptr<SymbolicStore> SymbolicStore::clone() const {
     auto newStore = std::make_unique<SymbolicStore>();
     for (const auto& [var, expr] : store_) {
-        // 注意：这里只是复制指针，实际实现中可能需要深拷贝表达式
-        newStore->store_[var] = expr;
+        // 深拷贝表达式对象
+        if (expr) {
+            // 根据表达式类型克隆
+            switch (expr->getType()) {
+                case ExprType::Constant: {
+                    auto* constExpr = dynamic_cast<ConstantExpr*>(expr);
+                    if (constExpr) {
+                        newStore->store_[var] = new ConstantExpr(constExpr->getValue());
+                    }
+                    break;
+                }
+                case ExprType::Variable: {
+                    auto* varExpr = dynamic_cast<VariableExpr*>(expr);
+                    if (varExpr) {
+                        newStore->store_[var] = new VariableExpr(varExpr->getName());
+                    }
+                    break;
+                }
+                default:
+                    // 其他类型的表达式暂时不深拷贝，只复制指针
+                    newStore->store_[var] = expr;
+                    break;
+            }
+        }
     }
     return newStore;
 }
@@ -225,10 +247,9 @@ std::unique_ptr<SymbolicState> SymbolicState::clone() const {
     // TODO: 实现完整的堆对象深拷贝
     // 目前跳过堆拷贝，功能不受影响
 
-    // 克隆路径约束
-    for (auto* constraint : pathConstraint_.getConstraints()) {
-        newState->pathConstraint_.add(constraint);
-    }
+    // 路径约束不克隆，因为每个路径的约束应该独立
+    // 新状态从空约束开始
+    // 如果需要复制约束，应该在调用 clone() 后显式添加
 
     newState->parent_ = parent_;
 
