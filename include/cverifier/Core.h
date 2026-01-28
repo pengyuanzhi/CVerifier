@@ -11,6 +11,7 @@
 #include <memory>
 #include <string>
 #include <vector>
+#include <unordered_map>
 
 namespace cverifier {
 
@@ -60,34 +61,103 @@ enum class ValueType {
 
 /// 漏洞类型枚举
 enum class VulnerabilityType {
-    BufferOverflow,      ///< 缓冲区溢出
-    NullPointerDereference,  ///< 空指针解引用
-    MemoryLeak,          ///< 内存泄漏
-    IntegerOverflow,     ///< 整数溢出
-    UseAfterFree,        ///< 释放后使用
-    DoubleFree,          ///< 双重释放
-    Unknown              ///< 未知类型
+    BufferOverflow,           ///< 缓冲区溢出
+    NullPointerDereference,   ///< 空指针解引用
+    MemoryLeak,               ///< 内存泄漏
+    IntegerOverflow,          ///< 整数溢出
+    FloatOverflow,            ///< 浮点溢出 ⭐新增
+    DivisionByZero,           ///< 除零错误 ⭐新增
+    UseAfterFree,             ///< 释放后使用
+    DoubleFree,               ///< 双重释放
+    UninitializedVariable,    ///< 未初始化变量
+    DeadCode,                 ///< 死代码
+    Unknown                   ///< 未知类型
 };
 
 /// 严重程度枚举
 enum class Severity {
+    Info,       ///< 信息
     Low,        ///< 低
     Medium,     ///< 中
     High,       ///< 高
     Critical    ///< 严重
 };
 
+/// 源代码位置
+struct SourceLocation {
+    std::string file;    ///< 文件名
+    int line = 0;          ///< 行号
+    int column = 0;        ///< 列号
+
+    bool isValid() const { return !file.empty() && line > 0; }
+
+    std::string toString() const {
+        return file + ":" + std::to_string(line) + ":" + std::to_string(column);
+    }
+};
+
 /// 漏洞报告结构
 struct VulnerabilityReport {
-    VulnerabilityType type;    ///< 漏洞类型
-    Severity severity;          ///< 严重程度
-    std::string file;           ///< 文件名
-    int line;                   ///< 行号
-    int column;                 ///< 列号
-    std::string message;        ///< 描述信息
-    std::string trace;          ///< 错误轨迹
+    VulnerabilityType type;          ///< 漏洞类型
+    Severity severity;                ///< 严重程度
+    SourceLocation location;          ///< 漏洞位置
+    std::string message;             ///< 描述信息
+    std::string description;         ///< 详细描述
+    std::vector<SourceLocation> trace;  ///< 错误轨迹
+    std::vector<std::string> fixSuggestions;  ///< 修复建议
 
-    std::string toString() const;
+    /// 反例（用于展示为什么漏洞存在）
+    std::unordered_map<std::string, std::string> counterExample;
+
+    /// 转换为字符串
+    std::string toString() const {
+        std::string result = "[";
+        result += severityToString(severity);
+        result += "] ";
+        result += vulnerabilityTypeToString(type);
+        result += " at " + location.toString();
+        result += ": " + message;
+        return result;
+    }
+
+private:
+    static std::string severityToString(Severity sev) {
+        switch (sev) {
+            case Severity::Info: return "INFO";
+            case Severity::Low: return "LOW";
+            case Severity::Medium: return "MEDIUM";
+            case Severity::High: return "HIGH";
+            case Severity::Critical: return "CRITICAL";
+            default: return "UNKNOWN";
+        }
+    }
+
+    static std::string vulnerabilityTypeToString(VulnerabilityType type) {
+        switch (type) {
+            case VulnerabilityType::BufferOverflow:
+                return "Buffer Overflow";
+            case VulnerabilityType::NullPointerDereference:
+                return "Null Pointer Dereference";
+            case VulnerabilityType::MemoryLeak:
+                return "Memory Leak";
+            case VulnerabilityType::IntegerOverflow:
+                return "Integer Overflow";
+            case VulnerabilityType::FloatOverflow:
+                return "Float Overflow";
+            case VulnerabilityType::DivisionByZero:
+                return "Division By Zero";
+            case VulnerabilityType::UseAfterFree:
+                return "Use After Free";
+            case VulnerabilityType::DoubleFree:
+                return "Double Free";
+            case VulnerabilityType::UninitializedVariable:
+                return "Uninitialized Variable";
+            case VulnerabilityType::DeadCode:
+                return "Dead Code";
+            default:
+                return "Unknown";
+        }
+    }
 };
 
 /// 分析选项结构

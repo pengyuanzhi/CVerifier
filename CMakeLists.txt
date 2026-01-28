@@ -10,21 +10,31 @@ set(CMAKE_CXX_EXTENSIONS OFF)
 message(STATUS "CVerifier v${PROJECT_VERSION}")
 message(STATUS "Build type: ${CMAKE_BUILD_TYPE}")
 
-# 查找LLVM
-find_package(LLVM 15 REQUIRED CONFIG)
+# 查找LLVM（可选）
+find_package(LLVM 15 QUIET CONFIG)
 
-message(STATUS "Found LLVM ${LLVM_PACKAGE_VERSION}")
-message(STATUS "Using LLVMConfig.cmake in: ${LLVM_DIR}")
+if(LLVM_FOUND)
+    message(STATUS "Found LLVM ${LLVM_PACKAGE_VERSION}")
+    message(STATUS "Using LLVMConfig.cmake in: ${LLVM_DIR}")
+else()
+    message(WARNING "LLVM not found. Clang frontend will be disabled.")
+endif()
 
-# 包含LLVM头文件
-include_directories(${LLVM_INCLUDE_DIRS})
-separate_arguments(LLVM_DEFINITIONS_LIST NATIVE_COMMAND ${LLVM_DEFINITIONS})
-add_definitions(${LLVM_DEFINITIONS_LIST})
+# 包含LLVM头文件（如果找到）
+if(LLVM_FOUND)
+    include_directories(${LLVM_INCLUDE_DIRS})
+    separate_arguments(LLVM_DEFINITIONS_LIST NATIVE_COMMAND ${LLVM_DEFINITIONS})
+    add_definitions(${LLVM_DEFINITIONS_LIST})
+endif()
 
-# 查找Z3
-find_package(Z3 4.12 REQUIRED)
+# 查找Z3（可选）
+find_package(Z3 4.12 QUIET)
 
-message(STATUS "Found Z3 ${Z3_VERSION}")
+if(Z3_FOUND)
+    message(STATUS "Found Z3 ${Z3_VERSION}")
+else()
+    message(WARNING "Z3 not found. SMT solver will use simplified implementation.")
+endif()
 
 # 设置包含目录
 include_directories(${CMAKE_SOURCE_DIR}/include)
@@ -36,50 +46,58 @@ include_directories(${CMAKE_SOURCE_DIR}/src)
 add_library(cverifier-core
     # IR模块
     src/core/IR/LLIRModule.cpp
-    src/core/IR/LLIRInstruction.cpp
-    src/core/IR/LLIRBasicBlock.cpp
     src/core/IR/CFG.cpp
 
     # State模块
     src/core/State/SymbolicState.cpp
-    src/core/State/SymbolicHeap.cpp
-    src/core/State/PathConstraint.cpp
-
-    # Utils模块
-    src/core/Utils/Logger.cpp
-    src/core/Utils/SourceLocation.cpp
 )
 
-target_link_libraries(cverifier-core PUBLIC
-    ${LLVM_LIBS}
-)
+target_link_libraries(cverifier-core PUBLIC)
+
+if(LLVM_FOUND)
+    target_link_libraries(cverifier-core PUBLIC ${LLVM_LIBS})
+endif()
+
+if(Z3_FOUND)
+    target_link_libraries(cverifier-core PUBLIC ${Z3_LIBRARIES})
+    target_compile_definitions(cverifier-core PUBLIC HAVE_Z3)
+endif()
 
 target_include_directories(cverifier-core PUBLIC
     ${CMAKE_SOURCE_DIR}/include
-    ${LLVM_INCLUDE_DIRS}
 )
+
+if(LLVM_FOUND)
+    target_include_directories(cverifier-core PUBLIC ${LLVM_INCLUDE_DIRS})
+endif()
+
+if(Z3_FOUND)
+    target_include_directories(cverifier-core PUBLIC ${Z3_INCLUDE_DIRS})
+endif()
 
 # ============================================================================
-# 前端库
+# 前端库（仅在找到LLVM时构建）
 # ============================================================================
-add_library(cverifier-frontend
-    src/frontend/clang/ClangParser.cpp
-    src/frontend/clang/ASTConsumer.cpp
-    src/frontend/clang/IRConverter.cpp
-)
+if(LLVM_FOUND)
+    add_library(cverifier-frontend
+        src/frontend/clang/ClangParser.cpp
+    )
 
-target_link_libraries(cverifier-frontend PUBLIC
-    cverifier-core
-    ${LLVM_LIBS}
-    clangFrontend
-    clangTooling
-    clangAST
-)
+    target_link_libraries(cverifier-frontend PUBLIC
+        cverifier-core
+        ${LLVM_LIBS}
+        clangFrontend
+        clangTooling
+        clangAST
+    )
 
-target_include_directories(cverifier-frontend PUBLIC
-    ${CMAKE_SOURCE_DIR}/include
-    ${LLVM_INCLUDE_DIRS}
-)
+    target_include_directories(cverifier-frontend PUBLIC
+        ${CMAKE_SOURCE_DIR}/include
+        ${LLVM_INCLUDE_DIRS}
+    )
+
+    target_compile_definitions(cverifier-frontend PUBLIC HAVE_LLVM)
+endif()
 
 # ============================================================================
 # 分析器库
@@ -87,40 +105,41 @@ target_include_directories(cverifier-frontend PUBLIC
 add_library(cverifier-analyzer
     # 符号执行
     src/analyzer/SymbolicExecution/Engine.cpp
-    src/analyzer/SymbolicExecution/PathExplorer.cpp
-    src/analyzer/SymbolicExecution/StateManager.cpp
 
     # 抽象解释
     src/analyzer/AbstractInterpretation/Interpreter.cpp
-    src/analyzer/AbstractInterpretation/TransferFunctions.cpp
-    src/analyzer/AbstractInterpretation/FixpointIterator.cpp
-    src/analyzer/AbstractInterpretation/Domains/IntervalDomain.cpp
-    src/analyzer/AbstractInterpretation/Domains/ConstantDomain.cpp
-
-    # 漏洞检测器
-    src/analyzer/Checkers/BufferOverflowChecker.cpp
-    src/analyzer/Checkers/NullPointerChecker.cpp
-    src/analyzer/Checkers/MemoryLeakChecker.cpp
-    src/analyzer/Checkers/IntegerOverflowChecker.cpp
-    src/analyzer/Checkers/CheckerRegistry.cpp
 
     # SMT求解器
     src/analyzer/Solver/Z3Solver.cpp
-    src/analyzer/Solver/ConstraintBuilder.cpp
+
+    # 漏洞检测器
+    src/analyzer/Checkers/EnhancedCheckers.cpp
 )
 
 target_link_libraries(cverifier-analyzer PUBLIC
     cverifier-core
-    cverifier-frontend
-    ${Z3_LIBRARIES}
-    ${LLVM_LIBS}
 )
+
+if(Z3_FOUND)
+    target_link_libraries(cverifier-analyzer PUBLIC ${Z3_LIBRARIES})
+    target_compile_definitions(cverifier-analyzer PUBLIC HAVE_Z3)
+endif()
+
+if(LLVM_FOUND)
+    target_link_libraries(cverifier-analyzer PUBLIC ${LLVM_LIBS})
+endif()
 
 target_include_directories(cverifier-analyzer PUBLIC
     ${CMAKE_SOURCE_DIR}/include
-    ${LLVM_INCLUDE_DIRS}
-    ${Z3_INCLUDE_DIRS}
 )
+
+if(LLVM_FOUND)
+    target_include_directories(cverifier-analyzer PUBLIC ${LLVM_INCLUDE_DIRS})
+endif()
+
+if(Z3_FOUND)
+    target_include_directories(cverifier-analyzer PUBLIC ${Z3_INCLUDE_DIRS})
+endif()
 
 # ============================================================================
 # 报告生成库
@@ -143,30 +162,140 @@ target_include_directories(cverifier-report PUBLIC
 # ============================================================================
 # 主程序
 # ============================================================================
-add_executable(cverifier
-    src/tools/cverifier.cpp
-)
+if(EXISTS ${CMAKE_SOURCE_DIR}/tools/cverifier.cpp)
+    add_executable(cverifier
+        tools/cverifier.cpp
+    )
 
-target_link_libraries(cverifier PRIVATE
-    cverifier-core
-    cverifier-frontend
-    cverifier-analyzer
-    cverifier-report
-    ${Z3_LIBRARIES}
-    ${LLVM_LIBS}
-)
+    target_link_libraries(cverifier PRIVATE
+        cverifier-core
+        cverifier-analyzer
+    )
 
-target_include_directories(cverifier PRIVATE
-    ${CMAKE_SOURCE_DIR}/include
-    ${LLVM_INCLUDE_DIRS}
-)
+    if(Z3_FOUND)
+        target_link_libraries(cverifier PRIVATE ${Z3_LIBRARIES})
+        target_compile_definitions(cverifier PRIVATE HAVE_Z3)
+    endif()
+
+    if(LLVM_FOUND)
+        target_link_libraries(cverifier PRIVATE ${LLVM_LIBS})
+    endif()
+
+    target_include_directories(cverifier PRIVATE
+        ${CMAKE_SOURCE_DIR}/include
+    )
+
+    if(LLVM_FOUND)
+        target_include_directories(cverifier PRIVATE ${LLVM_INCLUDE_DIRS})
+    endif()
+
+    if(Z3_FOUND)
+        target_include_directories(cverifier PRIVATE ${Z3_INCLUDE_DIRS})
+    endif()
+endif()
+
+# ============================================================================
+# Z3测试程序
+# ============================================================================
+if(EXISTS ${CMAKE_SOURCE_DIR}/tools/test_z3.cpp)
+    add_executable(test_z3
+        tools/test_z3.cpp
+    )
+
+    target_link_libraries(test_z3 PRIVATE
+        cverifier-core
+        cverifier-analyzer
+    )
+
+    if(Z3_FOUND)
+        target_link_libraries(test_z3 PRIVATE ${Z3_LIBRARIES})
+        target_compile_definitions(test_z3 PRIVATE HAVE_Z3)
+        target_include_directories(test_z3 PRIVATE ${Z3_INCLUDE_DIRS})
+    endif()
+
+    if(LLVM_FOUND)
+        target_link_libraries(test_z3 PRIVATE ${LLVM_LIBS})
+        target_include_directories(test_z3 PRIVATE ${LLVM_INCLUDE_DIRS})
+    endif()
+
+    target_include_directories(test_z3 PRIVATE
+        ${CMAKE_SOURCE_DIR}/include
+    )
+endif()
+
+# ============================================================================
+# Clang前端测试程序
+# ============================================================================
+if(LLVM_FOUND AND EXISTS ${CMAKE_SOURCE_DIR}/tools/test_clang.cpp)
+    add_executable(test_clang
+        tools/test_clang.cpp
+    )
+
+    target_link_libraries(test_clang PRIVATE
+        cverifier-core
+        cverifier-analyzer
+        cverifier-frontend
+    )
+
+    if(Z3_FOUND)
+        target_link_libraries(test_clang PRIVATE ${Z3_LIBRARIES})
+        target_compile_definitions(test_clang PRIVATE HAVE_Z3)
+        target_include_directories(test_clang PRIVATE ${Z3_INCLUDE_DIRS})
+    endif()
+
+    target_link_libraries(test_clang PRIVATE
+        ${LLVM_LIBS}
+        clangFrontend
+        clangTooling
+        clangAST
+    )
+
+    target_compile_definitions(test_clang PRIVATE HAVE_LLVM)
+
+    target_include_directories(test_clang PRIVATE
+        ${CMAKE_SOURCE_DIR}/include
+        ${LLVM_INCLUDE_DIRS}
+    )
+endif()
+
+# ============================================================================
+# 抽象解释测试程序
+# ============================================================================
+if(EXISTS ${CMAKE_SOURCE_DIR}/tools/test_abstract.cpp)
+    add_executable(test_abstract
+        tools/test_abstract.cpp
+    )
+
+    target_link_libraries(test_abstract PRIVATE
+        cverifier-core
+        cverifier-analyzer
+    )
+
+    if(Z3_FOUND)
+        target_link_libraries(test_abstract PRIVATE ${Z3_LIBRARIES})
+        target_compile_definitions(test_abstract PRIVATE HAVE_Z3)
+        target_include_directories(test_abstract PRIVATE ${Z3_INCLUDE_DIRS})
+    endif()
+
+    if(LLVM_FOUND)
+        target_link_libraries(test_abstract PRIVATE ${LLVM_LIBS})
+        target_compile_definitions(test_abstract PRIVATE HAVE_LLVM)
+        target_include_directories(test_abstract PRIVATE ${LLVM_INCLUDE_DIRS})
+    endif()
+
+    target_include_directories(test_abstract PRIVATE
+        ${CMAKE_SOURCE_DIR}/include
+    )
+endif()
 
 # ============================================================================
 # 测试
 # ============================================================================
 enable_testing()
 
-add_subdirectory(tests)
+if(EXISTS ${CMAKE_SOURCE_DIR}/tests/CMakeLists.txt)
+    add_subdirectory(tests)
+endif()
 
 # ============================================================================
 # 安装配置
@@ -217,7 +346,15 @@ message(STATUS "=========================================")
 message(STATUS "Version:        ${PROJECT_VERSION}")
 message(STATUS "Build type:     ${CMAKE_BUILD_TYPE}")
 message(STATUS "C++ Standard:   ${CMAKE_CXX_STANDARD}")
-message(STATUS "LLVM Version:   ${LLVM_PACKAGE_VERSION}")
-message(STATUS "Z3 Version:     ${Z3_VERSION}")
+if(LLVM_FOUND)
+    message(STATUS "LLVM:           Found (${LLVM_PACKAGE_VERSION})")
+else()
+    message(STATUS "LLVM:           Not Found (Clang frontend disabled)")
+endif()
+if(Z3_FOUND)
+    message(STATUS "Z3:             Found (${Z3_VERSION})")
+else()
+    message(STATUS "Z3:             Not Found (Using simplified SMT solver)")
+endif()
 message(STATUS "Install prefix: ${CMAKE_INSTALL_PREFIX}")
 message(STATUS "=========================================")

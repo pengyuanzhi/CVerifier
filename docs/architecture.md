@@ -13,7 +13,7 @@
   - [1.2 架构原则](#12-架构原则)
   - [1.3 架构风格](#13-架构风格)
 - [2. 系统架构](#2-系统架构)
-  - [2.1 六层架构设计](#21-六层架构设计)
+  - [2.1 八层架构设计](#21-八层架构设计)
   - [2.2 架构图](#22-架构图)
   - [2.3 架构说明](#23-架构说明)
   - [2.4 数据流](#24-数据流)
@@ -23,9 +23,27 @@
   - [3.3 核心分析层](#33-核心分析层)
   - [3.4 基础设施层](#34-基础设施层)
   - [3.5 用户接口层](#35-用户接口层)
+    - [3.5.1 CLI 工具](#351-cli-工具)
+    - [3.5.2 Web UI](#352-web-ui-新增)
+  - [3.6 规约层](#36-规约层-新增)
+    - [3.6.1 ACSL注解解析器](#361-acsl注解解析器)
+    - [3.6.2 验证函数库 (C API)](#362-验证函数库-c-api)
+    - [3.6.3 规约代码隔离](#363-规约代码隔离)
+  - [3.7 插件系统](#37-插件系统-新增)
+    - [3.7.1 插件接口](#371-插件接口)
+    - [3.7.2 插件加载器](#372-插件加载器)
+    - [3.7.3 插件配置](#373-插件配置)
+    - [3.7.4 插件沙箱](#374-插件沙箱)
 - [4. 技术选型](#4-技术选型)
   - [4.1 编程语言](#41-编程语言)
   - [4.2 框架选择](#42-框架选择)
+    - [4.2.1 LLVM/Clang 15+](#421-llvmclang-15)
+    - [4.2.2 CMake 3.20+](#422-cmake-320)
+    - [4.2.3 React 18+](#423-react-18-新增)
+    - [4.2.4 TypeScript](#424-typescript-新增)
+    - [4.2.5 Crow](#425-crow-新增)
+    - [4.2.6 WebSocket++](#426-websocket-新增)
+    - [4.2.7 nlohmann/json](#427-nlohmannjson-新增)
   - [4.3 依赖库](#43-依赖库)
   - [4.4 选型理由](#44-选型理由)
 - [5. 架构决策记录](#5-架构决策记录)
@@ -33,6 +51,11 @@
   - [5.2 为什么选择 Z3？](#52-为什么选择-z3)
   - [5.3 为什么使用自定义 LLIR？](#53-为什么使用自定义-llir)
   - [5.4 为什么采用混合分析策略？](#54-为什么采用混合分析策略)
+  - [5.5 为什么实现规约分离？](#55-为什么实现规约分离-新增)
+  - [5.6 为什么规约使用C语言？](#56-为什么规约使用c语言-新增)
+  - [5.7 为什么添加Web UI？](#57-为什么添加web-ui-新增)
+  - [5.8 为什么选择React而不是Vue/Angular？](#58-为什么选择react而不是vueangular-新增)
+  - [5.9 为什么选择Crow框架？](#59-为什么选择crow框架-新增)
 - [6. 部署架构](#6-部署架构)
   - [6.1 单机部署](#61-单机部署)
   - [6.2 容器部署](#62-容器部署)
@@ -143,70 +166,109 @@ CVerifier 采用 **分层架构** 和 **管道-过滤器架构** 的混合风格
 
 ## 2. 系统架构
 
-### 2.1 六层架构设计
+### 2.1 八层架构设计
 
-CVerifier 采用六层架构，从上到下依次为：
+CVerifier 采用八层架构，从上到下依次为：
 
-1. **用户接口层**：提供 CLI 工具、IDE 插件、Web UI（可选）
+1. **用户接口层**：提供 CLI 工具、IDE 插件、Web UI
 2. **分析配置层**：配置管理、检查规则、报告生成
 3. **核心分析层**：符号执行引擎、抽象解释器、混合分析器
 4. **中间表示层**：IR 转换、IR 优化、CFG 构建
 5. **基础设施层**：SMT 求解器、约束求解器、定理证明器
-6. **前端处理层**：预处理器、C Parser、AST 构建
+6. **规约层**：规约解析器、验证函数库、规约代码隔离 ⭐新增
+7. **插件系统**：插件加载器、插件接口、插件沙箱 ⭐新增
+8. **前端处理层**：预处理器、C Parser、AST 构建
 
 ### 2.2 架构图
 
 ```
-┌─────────────────────────────────────────────────────────┐
-│                    用户接口层                            │
-│  ┌──────────┐  ┌──────────┐  ┌──────────┐              │
-│  │ CLI 工具  │  │ IDE 插件 │  │ Web UI   │              │
-│  └──────────┘  └──────────┘  └──────────┘              │
-└─────────────────────────────────────────────────────────┘
+┌───────────────────────────────────────────────────────────────┐
+│                      用户接口层                                │
+│  ┌──────────┐  ┌──────────┐  ┌──────────────────────────┐     │
+│  │ CLI 工具  │  │ IDE 插件 │  │  Web UI (React前端)      │     │
+│  └──────────┘  └──────────┘  │  - 任务管理               │     │
+│                              │  - 代码编辑器 (Monaco)    │     │
+│                              │  - 实时进度监控           │     │
+│                              │  - 结果可视化             │     │
+│                              └──────────────────────────┘     │
+└───────────────────────────────────────────────────────────────┘
+                                   ↓ REST/WebSocket
+┌───────────────────────────────────────────────────────────────┐
+│                   Web 服务层 (Crow框架) ⭐新增                   │
+│  ┌──────────┐  ┌──────────┐  ┌──────────┐                    │
+│  │ REST API │  │WebSocket │  │ 任务调度器 │                    │
+│  └──────────┘  └──────────┘  └──────────┘                    │
+└───────────────────────────────────────────────────────────────┘
                           ↓
-┌─────────────────────────────────────────────────────────┐
-│                   分析配置层                             │
-│  ┌──────────┐  ┌──────────┐  ┌──────────┐              │
-│  │配置管理器 │  │ 检查规则 │  │ 报告生成 │              │
-│  └──────────┘  └──────────┘  └──────────┘              │
-└─────────────────────────────────────────────────────────┘
+┌───────────────────────────────────────────────────────────────┐
+│                     分析配置层                                 │
+│  ┌──────────┐  ┌──────────┐  ┌──────────┐                    │
+│  │配置管理器 │  │ 检查规则 │  │ 报告生成 │                    │
+│  └──────────┘  └──────────┘  └──────────┘                    │
+└───────────────────────────────────────────────────────────────┘
                           ↓
-┌─────────────────────────────────────────────────────────┐
-│                   核心分析层                             │
-│  ┌────────────┐  ┌────────────┐  ┌────────────┐        │
-│  │ 符号执行引擎 │  │ 抽象解释器 │  │ 混合分析器 │        │
-│  └────────────┘  └────────────┘  └────────────┘        │
-│  ┌────────────────────────────────────────────┐        │
-│  │         漏洞检测器                          │        │
-│  │  BufferOverflow │ NullPointer │ MemoryLeak │        │
-│  └────────────────────────────────────────────┘        │
-└─────────────────────────────────────────────────────────┘
+┌───────────────────────────────────────────────────────────────┐
+│                     核心分析层                                 │
+│  ┌────────────┐  ┌────────────┐  ┌────────────┐              │
+│  │ 符号执行引擎 │  │ 抽象解释器 │  │ 混合分析器 │              │
+│  └────────────┘  └────────────┘  └────────────┘              │
+│  ┌────────────────────────────────────────────────────────┐   │
+│  │              漏洞检测器                                   │   │
+│  │ Buffer │ NullPtr │ MemLeak │ IntOverflow │ Float ⭐   │   │
+│  │ Overflow│        │        │             │ DivideBy0 ⭐│   │
+│  └────────────────────────────────────────────────────────┘   │
+└───────────────────────────────────────────────────────────────┘
                           ↓
-┌─────────────────────────────────────────────────────────┐
-│                   中间表示层                             │
-│  ┌──────────┐  ┌──────────┐  ┌──────────┐              │
-│  │ IR 转换   │  │ IR 优化   │  │ CFG 构建  │              │
-│  └──────────┘  └──────────┘  └──────────┘              │
-│  ┌────────────────────────────────────────────┐        │
-│  │         LLIR (轻量级中间表示)               │        │
-│  └────────────────────────────────────────────┘        │
-└─────────────────────────────────────────────────────────┘
+┌───────────────────────────────────────────────────────────────┐
+│                     中间表示层                                 │
+│  ┌──────────┐  ┌──────────┐  ┌──────────┐                    │
+│  │ IR 转换   │  │ IR 优化   │  │ CFG 构建  │                    │
+│  └──────────┘  └──────────┘  └──────────┘                    │
+│  ┌────────────────────────────────────────────────────────┐   │
+│  │              LLIR (轻量级中间表示)                        │   │
+│  └────────────────────────────────────────────────────────┘   │
+└───────────────────────────────────────────────────────────────┘
                           ↓
-┌─────────────────────────────────────────────────────────┐
-│                   基础设施层                             │
-│  ┌──────────┐  ┌──────────┐  ┌──────────┐              │
-│  │ Z3 求解器 │  │ 约束构建器 │  │ 模型提取器 │              │
-│  └──────────┘  └──────────┘  └──────────┘              │
-└─────────────────────────────────────────────────────────┘
+┌───────────────────────────────────────────────────────────────┐
+│                     基础设施层                                 │
+│  ┌──────────┐  ┌──────────┐  ┌──────────┐                    │
+│  │ Z3 求解器 │  │ 约束构建器 │  │ 模型提取器 │                    │
+│  └──────────┘  └──────────┘  └──────────┘                    │
+└───────────────────────────────────────────────────────────────┘
                           ↓
-┌─────────────────────────────────────────────────────────┐
-│                   前端处理层                             │
-│  ┌──────────┐  ┌──────────┐  ┌──────────┐              │
-│  │ 预处理器  │  │ Clang    │  │ AST 构建 │              │
-│  │          │  │ Parser   │  │          │              │
-│  └──────────┘  └──────────┘  └──────────┘              │
-└─────────────────────────────────────────────────────────┘
+┌───────────────────────────────────────────────────────────────┐
+│                      规约层 ⭐新增                              │
+│  ┌────────────┐  ┌────────────┐  ┌──────────────────┐        │
+│  │ACSL解析器   │  │验证函数库   │  │ 规约代码隔离      │        │
+│  │/*@..*/     │  │ (C API)    │  │ - 独立编译        │        │
+│  └────────────┘  └────────────┘  │ - 命名空间隔离    │        │
+│                                 │ - 沙箱执行        │        │
+│                                 └──────────────────┘        │
+└───────────────────────────────────────────────────────────────┘
+                          ↓
+┌───────────────────────────────────────────────────────────────┐
+│                    插件系统 ⭐新增                              │
+│  ┌────────────┐  ┌────────────┐  ┌──────────────────┐        │
+│  │ 插件加载器   │  │ 插件接口    │  │ 插件沙箱          │        │
+│  │ .so/.dll   │  │ IPlugin    │  │ - 进程隔离        │        │
+│  └────────────┘  └────────────┘  │ - 资源限制        │        │
+│                                 └──────────────────┘        │
+└───────────────────────────────────────────────────────────────┘
+                          ↓
+┌───────────────────────────────────────────────────────────────┐
+│                     前端处理层                                 │
+│  ┌──────────┐  ┌──────────┐  ┌──────────┐                    │
+│  │ 预处理器  │  │ Clang    │  │ AST 构建 │                    │
+│  │          │  │ Parser   │  │          │                    │
+│  └──────────┘  └──────────┘  └──────────┘                    │
+└───────────────────────────────────────────────────────────────┘
 ```
+
+**架构说明**：
+- **工具主体**: C++17 实现
+- **规约API**: C语言实现，独立编译为共享库
+- **插件**: 动态加载 .so/.dll 文件
+- **Web UI**: React + TypeScript 前端，Crow C++ 后端
 
 ### 2.3 架构说明
 
@@ -536,6 +598,338 @@ cverifier [options] <source-files>
   --help                   # 帮助信息
 ```
 
+#### 3.5.2 Web UI ⭐新增
+
+**前端架构**：
+```
+web-ui/
+├── src/
+│   ├── components/          # React组件
+│   │   ├── TaskManager/     # 任务管理
+│   │   ├── CodeEditor/      # Monaco编辑器
+│   │   ├── ProgressMonitor/ # 进度监控
+│   │   ├── ResultsView/     # 结果查看
+│   │   └── VulnerabilityPanel/ # 漏洞面板
+│   ├── services/            # API服务
+│   │   ├── api.ts           # REST API封装
+│   │   └── websocket.ts     # WebSocket封装
+│   ├── pages/               # 页面
+│   │   ├── Dashboard.tsx
+│   │   ├── Analysis.tsx
+│   │   └── Results.tsx
+│   └── utils/               # 工具函数
+├── public/
+│   └── index.html
+├── package.json
+└── tsconfig.json
+```
+
+**后端架构**：
+```cpp
+// Web服务器 (C++ Crow框架)
+class WebServer {
+public:
+    void start(int port);
+    void stop();
+
+private:
+    // REST API端点
+    void setupRoutes();
+    void handleGetTasks(crow::request& req, crow::response& res);
+    void handleCreateTask(crow::request& req, crow::response& res);
+    void handleGetResults(crow::request& req, crow::response& res);
+
+    // WebSocket端点
+    void setupWebSocket();
+    void broadcastProgress(const std::string& taskId, int progress);
+
+    crow::SimpleApp app_;
+    TaskScheduler& scheduler_;
+};
+```
+
+**通信协议**：
+- **REST API**: HTTP/JSON
+- **实时通信**: WebSocket
+- **认证**: JWT Token
+
+### 3.6 规约层 ⭐新增
+
+**职责**：解析和管理C语言编写的验证规约，实现规约与用户代码的分离
+
+#### 3.6.1 ACSL注解解析器
+
+**功能**：解析ACSL风格的注解（/*@ ... */）
+
+**接口**：
+```cpp
+class SpecParser {
+public:
+    // 解析规约注解
+    std::vector<Specification*> parse(const std::string& source);
+
+    // 提取前置条件
+    std::vector<Expr*> extractRequires(Function* func);
+
+    // 提取后置条件
+    std::vector<Expr*> extractEnsures(Function* func);
+
+    // 提取循环不变量
+    std::vector<Expr*> extractInvariant(Loop* loop);
+};
+```
+
+**支持的ACSL语法**：
+```c
+/*@
+  requires \valid_read(ptr);
+  requires size > 0;
+  requires \separated(ptr, other);
+  assigns \nothing;
+  ensures \result == 0 || \result == 1;
+*/
+int process(char* ptr, int size, char* other);
+```
+
+#### 3.6.2 验证函数库 (C API)
+
+**功能**：提供预定义的C语言验证函数
+
+**接口定义**：
+```c
+// verification.h - C语言验证API
+
+// 内存验证
+bool verifiable_read(void* ptr, int size);
+bool verifiable_write(void* ptr, int size);
+bool verifiable_pointer(void* ptr);
+bool verifiable_separated(void* ptr1, void* ptr2, int size);
+
+// 数值验证
+bool in_range(int value, int min, int max);
+bool is_positive(int value);
+bool is_nonzero(int value);
+
+// 断言函数
+void assert_true(bool condition, const char* msg);
+#define STATIC_ASSERT(cond) _Static_assert(cond, #cond)
+```
+
+**编译为共享库**：
+```cmake
+# CMakeLists.txt for spec library
+add_library(verification SHARED
+    src/verifiable_read.c
+    src/verifiable_write.c
+    src/assertions.c
+)
+
+target_include_directories(verification PUBLIC
+    ${CMAKE_SOURCE_DIR}/include
+)
+```
+
+#### 3.6.3 规约代码隔离
+
+**隔离机制**：
+
+1. **独立编译**：
+   ```bash
+   # 规约代码编译为独立共享库
+   gcc -shared -fPIC -o libverification.so specs/*.c
+   ```
+
+2. **命名空间隔离**：
+   ```c
+   #ifdef VERIFICATION_SPEC
+   // 规约代码只在此宏定义下编译
+   int ver_buffer_check(char* ptr, int size) { ... }
+   #endif
+   ```
+
+3. **沙箱执行**：
+   ```cpp
+   class SpecSandbox {
+   public:
+       // 在独立进程中执行规约代码
+       VerificationResult executeInSandbox(
+           const std::string& specCode,
+           const std::vector<std::string>& args
+       );
+   };
+   ```
+
+**目录结构**：
+```
+project/
+├── src/                    # 用户业务代码 (C/C++)
+│   └── main.c
+├── specs/                  # 规约代码 (C语言)
+│   ├── buffer.spec.c
+│   ├── memory.spec.c
+│   └── libverification.so  # 编译后的规约库
+└── cverifier               # 验证工具 (C++17)
+```
+
+### 3.7 插件系统 ⭐新增
+
+**职责**：支持动态加载验证插件，扩展工具功能
+
+#### 3.7.1 插件接口
+
+**定义**：
+```cpp
+// IPlugin.h
+class IPlugin {
+public:
+    virtual ~IPlugin() = default;
+
+    // 插件信息
+    virtual std::string getName() const = 0;
+    virtual std::string getVersion() const = 0;
+    virtual std::string getDescription() const = 0;
+
+    // 生命周期管理
+    virtual void initialize(const PluginConfig& config) = 0;
+    virtual void shutdown() = 0;
+
+    // 验证函数
+    virtual bool verify(LLIRFunction* func) = 0;
+
+    // 报告生成
+    virtual std::vector<VulnerabilityReport> getReports() const = 0;
+};
+```
+
+**插件示例**：
+```cpp
+// CustomChecker.cpp
+class CustomChecker : public IPlugin {
+public:
+    std::string getName() const override {
+        return "CustomChecker";
+    }
+
+    std::string getVersion() const override {
+        return "1.0.0";
+    }
+
+    void initialize(const PluginConfig& config) override {
+        // 加载配置
+    }
+
+    bool verify(LLIRFunction* func) override {
+        // 自定义验证逻辑
+        return true;
+    }
+
+    std::vector<VulnerabilityReport> getReports() const override {
+        return reports_;
+    }
+
+private:
+    std::vector<VulnerabilityReport> reports_;
+};
+
+// 导出插件工厂函数
+extern "C" {
+    IPlugin* createPlugin() {
+        return new CustomChecker();
+    }
+
+    void destroyPlugin(IPlugin* plugin) {
+        delete plugin;
+    }
+}
+```
+
+#### 3.7.2 插件加载器
+
+**功能**：动态加载.so/.dll文件
+
+```cpp
+class PluginLoader {
+public:
+    // 从目录加载所有插件
+    void loadPluginsFromDirectory(const std::string& dir);
+
+    // 加载单个插件
+    std::shared_ptr<IPlugin> loadPlugin(const std::string& path);
+
+    // 卸载插件
+    void unloadPlugin(const std::string& name);
+
+    // 获取所有插件
+    std::vector<std::shared_ptr<IPlugin>> getAllPlugins();
+
+private:
+#ifdef _WIN32
+    HMODULE loadLibrary(const std::string& path);
+#else
+    void* loadLibrary(const std::string& path);
+#endif
+
+    std::unordered_map<std::string, std::shared_ptr<IPlugin>> plugins_;
+};
+```
+
+#### 3.7.3 插件配置
+
+**配置文件格式**：
+```yaml
+# plugins.yaml
+plugins:
+  - name: BufferOverflowPlugin
+    path: /usr/lib/cverifier/plugins/libbufferoverflow.so
+    enabled: true
+    priority: 10
+
+  - name: FloatCheckerPlugin
+    path: /usr/lib/cverifier/plugins/libfloatchecker.so
+    enabled: true
+    priority: 8
+    config:
+      check-precision-loss: true
+      check-rounding-error: true
+
+  - name: CustomPlugin
+    path: /home/user/.cverifier/plugins/libcustom.so
+    enabled: true
+```
+
+#### 3.7.4 插件沙箱
+
+**安全机制**：
+
+1. **进程隔离**：
+   ```cpp
+   class PluginSandbox {
+   public:
+       // 在独立进程中执行插件
+       template<typename F>
+       auto executeInSandbox(F&& func) -> decltype(func());
+   };
+   ```
+
+2. **资源限制**：
+   ```cpp
+   struct ResourceLimits {
+       size_t maxMemoryMB;     // 最大内存使用
+       int maxCPUTimeSec;      // 最大CPU时间
+       int maxThreads;         // 最大线程数
+   };
+   ```
+
+3. **异常处理**：
+   ```cpp
+   try {
+       plugin->verify(function);
+   } catch (const std::exception& e) {
+       // 记录错误，但不影响主程序
+       logger.error("Plugin crashed: " + std::string(e.what()));
+   }
+   ```
+
 ---
 
 ## 4. 技术选型
@@ -581,6 +975,101 @@ target_link_libraries(cverifier ${LLVM_LIBS})
 1. **跨平台**：支持 Linux、macOS、Windows
 2. **LLVM 集成**：LLVM 使用 CMake
 3. **广泛使用**：事实上的标准
+
+#### 4.2.3 React 18+ ⭐新增
+
+**选择理由**：
+1. **组件化架构**：易于构建复杂的 UI
+2. **丰富的生态系统**：Ant Design, Material-UI
+3. **TypeScript 支持**：类型安全
+4. **虚拟 DOM**：高性能渲染
+5. **大型社区**：大量的库和工具
+
+**用于**：Web UI 前端
+
+**核心库**：
+- `react` + `react-dom`
+- `@types/react` + `@types/react-dom`
+- `antd` (Ant Design) 或 `@mui/material`
+- `axios` (HTTP 客户端)
+- `@monaco-editor/react` (代码编辑器)
+
+#### 4.2.4 TypeScript ⭐新增
+
+**选择理由**：
+1. **类型安全**：编译时错误检测
+2. **IDE 支持**：优秀的智能提示
+3. **可维护性**：大型项目易于维护
+4. **现代语法**：支持最新 ES 特性
+
+**用于**：Web UI 前端开发
+
+#### 4.2.5 Crow ⭐新增
+
+**选择理由**：
+1. **C++ 原生**：与验证工具无缝集成
+2. **轻量级**：简单易用，无复杂依赖
+3. **RESTful**：支持路由、JSON 处理
+4. **内置 WebSocket**：支持实时通信
+5. **高性能**：基于 ASIO，异步处理
+
+**用于**：Web 后端服务器
+
+**示例**：
+```cpp
+crow::SimpleApp app;
+
+CROW_ROUTE(app, "/api/tasks").methods("GET"_method)
+([](const crow::request& req) {
+    std::vector<Task> tasks = taskManager.getAllTasks();
+    return crow::json::wvalue{{"tasks", tasks}};
+});
+
+CROW_ROUTE(app, "/api/tasks").methods("POST"_method)
+([](const crow::request& req) {
+    auto data = crow::json::load(req.body);
+    Task task = taskManager.createTask(data);
+    return crow::json::wvalue{{"taskId", task.id}};
+});
+
+app.port(8080).multithreaded().run();
+```
+
+#### 4.2.6 WebSocket++ ⭐新增
+
+**选择理由**：
+1. **实时通信**：支持任务进度推送
+2. **双向通信**：服务器主动推送消息
+3. **轻量级**：Header-only 库
+4. **与 Crow 集成**：Crow 内置 WebSocket 支持
+
+**用于**：实时进度更新、日志流
+
+#### 4.2.7 nlohmann/json ⭐新增
+
+**选择理由**：
+1. **C++ 原生**：现代 C++ JSON 库
+2. **易用性**：直观的 API
+3. **Header-only**：易于集成
+4. **广泛使用**：业界标准
+
+**用于**：JSON 序列化/反序列化
+
+**示例**：
+```cpp
+#include <nlohmann/json.hpp>
+using json = nlohmann::json;
+
+// 序列化
+json j;
+j["name"] = "CVerifier";
+j["version"] = "1.0.0";
+std::string s = j.dump();
+
+// 反序列化
+json j2 = json::parse(s);
+std::string name = j2["name"];
+```
 
 ### 4.3 依赖库
 
@@ -790,6 +1279,279 @@ target_link_libraries(cverifier ${LLVM_LIBS})
   2. 如果抽象域表明不可行，剪枝
   3. 如果可行，使用符号执行精确分析
 ```
+
+### 5.5 为什么实现规约分离？ ⭐新增
+
+#### 决策背景
+
+需要支持用户自定义验证规则，同时保持工具的通用性和可扩展性
+
+#### 考虑的选项
+
+1. **硬编码检查规则**：规则内置在工具中
+2. **配置文件**：使用 YAML/JSON 配置
+3. **嵌入式 DSL**：自定义领域特定语言
+4. **规约分离（ACSL风格）**：C语言注解 + 独立编译
+
+#### 决策：规约分离（ACSL风格）
+
+**理由**：
+
+1. **代码与规约分离**
+   - 用户代码不包含验证逻辑
+   - 规约可以独立更新
+   - 验证失败不会影响业务代码
+
+2. **C语言兼容性**
+   - 开发者熟悉C语言
+   - 无需学习新语言
+   - 可以使用C的表达能力
+
+3. **工业验证**
+   - ACSL是业界标准（Frama-C）
+   - 大量现有规约可复用
+   - 工具链成熟
+
+4. **灵活性和可扩展性**
+   - 支持自定义验证函数
+   - 可以创建复杂的不变量
+   - 支持合约式编程
+
+**权衡**：
+- ⚠️ 增加解析复杂度
+- ⚠️ 需要维护规约库
+
+**缓解措施**：
+- 提供丰富的预定义验证函数库
+- 提供规约模板和示例
+- 支持规约的自动检查
+
+### 5.6 为什么规约使用C语言？ ⭐新增
+
+#### 决策背景
+
+需要选择规约代码的实现语言
+
+#### 考虑的选项
+
+1. **C++**：与工具主体一致
+2. **Python**：易用性强
+3. **自定义DSL**：专门为规约设计
+4. **C语言**：与被验证代码一致
+
+#### 决策：C语言
+
+**理由**：
+
+1. **与被验证代码一致**
+   - 被验证代码是C语言
+   - 规约代码使用相同语言，易于理解
+   - 可以共享类型和宏定义
+
+2. **简单明确**
+   - 语法简单，无隐藏行为
+   - 容易进行符号执行
+   - 编译为机器码后性能高
+
+3. **可移植性**
+   - C编译器无处不在
+   - 跨平台支持好
+   - 易于集成到CI/CD
+
+4. **工业标准**
+   - ACSL基于C语言
+   - MISRA C等规范使用C
+   - 许多安全关键系统使用C
+
+**接口设计**：
+```c
+// verification.h
+#ifdef __cplusplus
+extern "C" {
+#endif
+
+// 内存验证函数
+bool verifiable_read(void* ptr, int size);
+
+// 数值验证函数
+bool in_range(int value, int min, int max);
+
+// 断言函数
+void assert_true(bool condition, const char* msg);
+
+#ifdef __cplusplus
+}
+#endif
+```
+
+### 5.7 为什么添加Web UI？ ⭐新增
+
+#### 决策背景
+
+需要提供更友好的用户界面和更好的协作体验
+
+#### 考虑的选项
+
+1. **仅CLI工具**：保持简单
+2. **桌面GUI**：使用Qt/GTK
+3. **IDE插件**：VS Code、JetBrains插件
+4. **Web UI**：基于浏览器的界面
+
+#### 决策：Web UI + CLI
+
+**理由**：
+
+1. **跨平台**
+   - 浏览器无处不在
+   - 无需安装客户端
+   - 自动更新
+
+2. **协作功能**
+   - 多用户同时访问
+   - 任务共享和权限管理
+   - 审计日志
+
+3. **任务管理**
+   - 可视化任务队列
+   - 实时进度监控
+   - 批量任务处理
+
+4. **结果可视化**
+   - 代码编辑器集成（Monaco）
+   - 交互式漏洞查看
+   - 报告导出（PDF/SARIF）
+
+5. **远程分析**
+   - 云端执行
+   - 分布式分析
+   - 资源共享
+
+**权衡**：
+- ⚠️ 增加开发和维护成本
+- ⚠️ 需要额外的服务器
+
+**缓解措施**：
+- Web UI作为可选功能
+- CLI仍然是核心
+- 提供Docker镜像简化部署
+
+### 5.8 为什么选择React而不是Vue/Angular？ ⭐新增
+
+#### 决策背景
+
+需要选择Web前端框架
+
+#### 考虑的选项
+
+1. **React**：Facebook开发的UI库
+2. **Vue.js**：渐进式框架
+3. **Angular**：完整的平台
+4. **Svelte**：编译型框架
+
+#### 决策：React + TypeScript
+
+**理由**：
+
+1. **生态系统成熟**
+   - 丰富的组件库（Ant Design, Material-UI）
+   - 大量的第三方库
+   - 活跃的社区
+
+2. **Monaco Editor集成**
+   - VS Code同款编辑器
+   - TypeScript原生支持
+   - 强大的代码高亮和导航
+
+3. **TypeScript支持**
+   - 类型安全
+   - IDE智能提示
+   - 大型项目可维护
+
+4. **人才储备**
+   - React开发者众多
+   - 学习资源丰富
+   - 招聘容易
+
+5. **灵活性**
+   - 库而非框架
+   - 可以选择状态管理（Redux/Zustand）
+   - 可以选择路由方案
+
+**技术栈**：
+```json
+{
+  "dependencies": {
+    "react": "^18.2.0",
+    "react-dom": "^18.2.0",
+    "antd": "^5.0.0",
+    "axios": "^1.4.0",
+    "@monaco-editor/react": "^4.5.0"
+  },
+  "devDependencies": {
+    "typescript": "^5.0.0",
+    "vite": "^4.3.0",
+    "@types/react": "^18.2.0"
+  }
+}
+```
+
+### 5.9 为什么选择Crow框架？ ⭐新增
+
+#### 决策背景
+
+需要选择C++ Web框架来实现REST API和WebSocket服务
+
+#### 考虑的选项
+
+1. **Crow**：轻量级C++ Web框架
+2. **Drogon**：高性能C++14/17 Web框架
+3. **Pistache**：HTTP/REST框架
+4. **Oat++**：现代C++ Web框架
+5. **cpp-httplib**：Header-only库
+
+#### 决策：Crow
+
+**理由**：
+
+1. **C++原生集成**
+   - 与验证工具（C++17）无缝集成
+   - 可以直接调用核心API
+   - 无需额外的语言绑定
+
+2. **轻量级**
+   - Header-only（大部分）
+   - 依赖少（只需Boost）
+   - 编译快速
+
+3. **易用性**
+   - 路由定义直观
+   - JSON处理简单
+   - 内置WebSocket支持
+
+4. **性能**
+   - 基于Boost.Asio
+   - 异步I/O
+   - 多线程支持
+
+5. **与工具集成简单**
+   ```cpp
+   // 示例：直接调用AnalysisManager
+   CROW_ROUTE(app, "/api/analyze").methods("POST"_method)
+   [&analyzer](const crow::request& req) {
+       auto data = crow::json::load(req.body);
+       auto result = analyzer.analyze(data["files"]);
+       return crow::json::wvalue{{"result", result}};
+   };
+   ```
+
+**权衡**：
+- ⚠️ 社区相对较小
+- ⚠️ 文档不如Drogon完整
+
+**缓解措施**：
+- 框架代码简单，易于阅读和调试
+- 主要功能稳定
+- 如需迁移，API抽象层支持切换
 
 ---
 
