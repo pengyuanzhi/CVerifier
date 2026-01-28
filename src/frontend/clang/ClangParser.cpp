@@ -340,7 +340,7 @@ void ASTToLLIRConverter::convertWhileStmt(clang::WhileStmt* whileStmt) {
 
     // 创建条件分支
     auto* brInst = core::LLIRFactory::createConditionalBr(condition, bodyBB, endBB,
-        whileStmt->getWhileLoc());
+        SourceLocation{});
     currentBB_->addInstruction(brInst);
 
     // 转换循环体
@@ -390,7 +390,7 @@ void ASTToLLIRConverter::convertForStmt(clang::ForStmt* forStmt) {
     if (forStmt->getCond()) {
         LLIRValue* condition = convertExpr(forStmt->getCond());
         auto* brInst = core::LLIRFactory::createConditionalBr(condition, bodyBB, endBB,
-            forStmt->getForLoc());
+            SourceLocation{});
         currentBB_->addInstruction(brInst);
     } else {
         // 无条件：总是进入循环体
@@ -436,7 +436,7 @@ void ASTToLLIRConverter::convertReturnStmt(clang::ReturnStmt* retStmt) {
     }
 
     auto* retInst = core::LLIRFactory::createRet(returnValue,
-        retStmt->getReturnLoc());
+        SourceLocation{});
     currentBB_->addInstruction(retInst);
 }
 
@@ -548,7 +548,7 @@ LLIRValue* ASTToLLIRConverter::convertUnaryOperator(clang::UnaryOperator* unaryO
         case clang::UO_Deref: {
             // 解引用操作：load
             auto* loadInst = core::LLIRFactory::createLoad(operand,
-                unaryOp->getExprLoc());
+                SourceLocation{});
             currentBB_->addInstruction(loadInst);
             return operand;
         }
@@ -576,12 +576,12 @@ LLIRValue* ASTToLLIRConverter::convertArraySubscriptExpr(clang::ArraySubscriptEx
 
     // 创建 GEP 指令
     auto* gepInst = core::LLIRFactory::createGetElementPtr(base, index,
-        arraySub->getExprLoc());
+        SourceLocation{});
     currentBB_->addInstruction(gepInst);
 
     // 创建 load 指令（获取数组元素）
     auto* loadInst = core::LLIRFactory::createLoad(gepInst,
-        arraySub->getExprLoc());
+        SourceLocation{});
     currentBB_->addInstruction(loadInst);
 
     return base;
@@ -615,7 +615,7 @@ LLIRValue* ASTToLLIRConverter::convertCallExpr(clang::CallExpr* callExpr) {
 
     // 创建 call 指令
     auto* callInst = core::LLIRFactory::createCall(functionName, args,
-        callExpr->getExprLoc());
+        SourceLocation{});
     currentBB_->addInstruction(callInst);
 
     return core::LLIRFactory::createVariable(

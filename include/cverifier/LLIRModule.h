@@ -10,6 +10,9 @@
 namespace cverifier {
 namespace core {
 
+// 引入父命名空间的类型
+using SourceLocation = cverifier::SourceLocation;
+
 // ============================================================================
 // LLIR - 轻量级LLVM IR表示
 // ============================================================================
@@ -51,18 +54,6 @@ enum class LLIRInstructionType {
     Phi,        ///< PHI节点
     Select,     ///< 选择
     Assert      ///< 断言（用于漏洞检测）
-};
-
-/**
- * @brief 源代码位置信息
- */
-struct SourceLocation {
-    std::string file;
-    int line = 0;
-    int column = 0;
-
-    bool isValid() const { return !file.empty(); }
-    std::string toString() const;
 };
 
 /**

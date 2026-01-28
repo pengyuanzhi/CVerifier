@@ -27,6 +27,7 @@ using core::LLIRFunction;
 using core::LLIRBasicBlock;
 using core::LLIRValue;
 using core::LLIRInstruction;
+using core::LLIRInstructionType;
 using core::LLIRFactory;
 
 // ValueType 在 cverifier 命名空间中，不在 core 中
