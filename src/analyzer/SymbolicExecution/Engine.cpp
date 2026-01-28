@@ -30,13 +30,21 @@ SymbolicExecutionEngine::SymbolicExecutionEngine(
 SymbolicExecutionEngine::~SymbolicExecutionEngine() {
     // 清理工作列表
     while (!worklist_.empty()) {
-        delete worklist_.front();
+        ExplorationState* explState = worklist_.front();
         worklist_.pop();
+        if (explState) {
+            if (explState->symbolicState) {
+                delete explState->symbolicState;
+            }
+            delete explState;
+        }
     }
 
     // 清理可达状态
     for (auto* state : reachedStates_) {
-        delete state;
+        if (state) {
+            delete state;
+        }
     }
 }
 
@@ -87,7 +95,16 @@ void SymbolicExecutionEngine::runOnFunction(const std::string& functionName) {
 }
 
 void SymbolicExecutionEngine::explore() {
+    utils::Logger::info("Starting path exploration with " +
+                       std::to_string(worklist_.size()) + " initial states");
+
+    int iterations = 0;
     while (!worklist_.empty()) {
+        ++iterations;
+
+        utils::Logger::debug("Iteration " + std::to_string(iterations) +
+                           ", worklist size: " + std::to_string(worklist_.size()));
+
         // 检查超时
         double elapsed = utils::Timer().elapsedSec() - startTime_;
         if (elapsed > config_.timeout) {
@@ -108,8 +125,12 @@ void SymbolicExecutionEngine::explore() {
         SymbolicState* state = explorationState->symbolicState;
         CFGNode* node = explorationState->currentNode;
 
+        utils::Logger::debug("Processing node: " + node->getId());
+
         // 路径剪枝检查
         if (config_.enablePathPruning && shouldPrunePath(state)) {
+            utils::Logger::debug("Path pruned, skipping state");
+            delete state;
             delete explorationState;
             continue;
         }
@@ -121,11 +142,15 @@ void SymbolicExecutionEngine::explore() {
             explorationState->instructionIndex
         );
 
-        // 将状态加入可达状态集合
+        // 将状态加入可达状态集合（现在状态的所有权转移到 reachedStates_）
         reachedStates_.push_back(state);
 
+        // 删除探索状态包装器，但不删除 symbolicState
+        explorationState->symbolicState = nullptr;
         delete explorationState;
     }
+
+    utils::Logger::info("Explored " + std::to_string(exploredPaths_) + " paths");
 }
 
 void SymbolicExecutionEngine::executeBasicBlock(
@@ -249,9 +274,20 @@ void SymbolicExecutionEngine::executeBranch(
     // 简化实现：无条件分支，直接跳转到后继节点
     const auto& successors = currentNode->getSuccessors();
 
+    if (successors.empty()) {
+        utils::Logger::warning("Branch instruction has no successors");
+        return;
+    }
+
     for (auto* succ : successors) {
         // 克隆状态
-        auto* newState = state->clone().release();
+        auto cloned = state->clone();
+        auto* newState = cloned.release();
+
+        if (!newState) {
+            utils::Logger::error("Failed to clone symbolic state");
+            continue;
+        }
 
         // 创建新的探索状态
         auto* newExplorationState = new ExplorationState(newState, succ);
@@ -259,6 +295,8 @@ void SymbolicExecutionEngine::executeBranch(
 
         // 加入工作列表
         worklist_.push(newExplorationState);
+
+        utils::Logger::debug("Added new exploration state for node: " + succ->getId());
     }
 }
 

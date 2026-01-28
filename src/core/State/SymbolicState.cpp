@@ -92,9 +92,18 @@ void SymbolicStore::merge(const SymbolicStore& other) {
 
 std::string SymbolicStore::toString() const {
     std::ostringstream oss;
-    oss << "{\n";
+    oss << "{";
+    bool first = true;
     for (const auto& [var, expr] : store_) {
-        oss << "  " << var << " = " << expr->toString() << "\n";
+        if (!first) {
+            oss << ", ";
+        }
+        first = false;
+        if (expr) {
+            oss << var << " = " << expr->toString();
+        } else {
+            oss << var << " = <null>";
+        }
     }
     oss << "}";
     return oss.str();
