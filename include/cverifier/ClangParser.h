@@ -2,6 +2,8 @@
 #define CVERIFIER_CLANG_PARSER_H
 
 #include "cverifier/LLIRModule.h"
+#include "cverifier/LLIRValue.h"
+#include "cverifier/LLIRFactory.h"
 #include "cverifier/Core.h"
 #include <string>
 #include <memory>
