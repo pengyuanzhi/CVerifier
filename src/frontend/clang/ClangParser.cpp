@@ -725,14 +725,31 @@ LLIRModule* ClangParser::parseFile(
     args.push_back("-I/usr/include");
     args.push_back("-I/usr/local/include");
 
-    // 创建前端动作
-    auto action = std::make_unique<CVerifierFrontendAction>(module);
+    // 创建前端动作工厂
+    class ActionFactory : public clang::tooling::FrontendActionFactory {
+    public:
+        ActionFactory(LLIRModule* module) : module_(module) {}
+
+        std::unique_ptr<clang::FrontendAction> create() override {
+            return std::make_unique<CVerifierFrontendAction>(module_);
+        }
+
+        bool runInvocation(std::shared_ptr<clang::CompilerInvocation> Invocation,
+                          clang::FileManager* Files,
+                          std::shared_ptr<clang::PCHContainerOperations> PCHContainerOps,
+                          clang::DiagnosticConsumer* DiagConsumer) override {
+            return true;
+        }
+
+    private:
+        LLIRModule* module_;
+    };
 
     // 使用 clang::tooling::runToolOnCode 运行
+    // 注意：LLVM 15 的 runToolOnCode 需要特定的参数
     bool success = clang::tooling::runToolOnCode(
-        std::move(action),
+        std::make_unique<ActionFactory>(module),
         code,
-        filename,
         args
     );
 
