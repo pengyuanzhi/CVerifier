@@ -67,11 +67,14 @@ void SymbolicExecutionEngine::runOnFunction(const std::string& functionName) {
     utils::Logger::info("Starting symbolic execution for function: " + functionName);
 
     // 创建CFG
+    utils::Logger::debug("Creating CFG for function: " + functionName);
     auto* cfg = new CFG(func);
 
     // 创建初始状态
+    utils::Logger::debug("Creating initial symbolic state");
     auto* initialState = new SymbolicState(nullptr);
 
+    utils::Logger::debug("Getting entry node from CFG");
     // 获取入口节点
     CFGNode* entryNode = cfg->getEntryNode();
     if (!entryNode) {
@@ -81,9 +84,16 @@ void SymbolicExecutionEngine::runOnFunction(const std::string& functionName) {
         return;
     }
 
+    utils::Logger::debug("Entry node found: " + entryNode->getId());
+    utils::Logger::debug("Creating initial exploration state");
+
     // 创建初始探索状态并加入工作列表
     auto* initialExplorationState = new ExplorationState(initialState, entryNode);
+
+    utils::Logger::debug("Adding exploration state to worklist");
     worklist_.push(initialExplorationState);
+
+    utils::Logger::debug("Worklist size after push: " + std::to_string(worklist_.size()));
 
     // 开始探索
     explore();
@@ -98,6 +108,8 @@ void SymbolicExecutionEngine::explore() {
     utils::Logger::info("Starting path exploration with " +
                        std::to_string(worklist_.size()) + " initial states");
 
+    utils::Logger::debug("About to enter exploration loop");
+
     int iterations = 0;
     while (!worklist_.empty()) {
         ++iterations;
@@ -105,10 +117,43 @@ void SymbolicExecutionEngine::explore() {
         utils::Logger::debug("Iteration " + std::to_string(iterations) +
                            ", worklist size: " + std::to_string(worklist_.size()));
 
+        utils::Logger::debug("Fetching exploration state from worklist");
+
+        // 从工作列表中取出一个状态
+        ExplorationState* explorationState = worklist_.front();
+
+        utils::Logger::debug("Got exploration state, popping from worklist");
+        worklist_.pop();
+
+        utils::Logger::debug("Extracting state and node from exploration state");
+
+        SymbolicState* state = explorationState->symbolicState;
+        CFGNode* node = explorationState->currentNode;
+
+        if (!state || !node) {
+            utils::Logger::error("Null state or node in exploration state!");
+            if (explorationState) {
+                delete explorationState;
+            }
+            continue;
+        }
+
+        utils::Logger::debug("Processing node: " + node->getId());
+
+        // 路径剪枝检查
+        if (config_.enablePathPruning && shouldPrunePath(state)) {
+            utils::Logger::debug("Path pruned, skipping state");
+            delete state;
+            delete explorationState;
+            continue;
+        }
+
         // 检查超时
         double elapsed = utils::Timer().elapsedSec() - startTime_;
         if (elapsed > config_.timeout) {
             utils::Logger::warning("Symbolic execution timeout");
+            delete state;
+            delete explorationState;
             break;
         }
 
