@@ -690,30 +690,6 @@ std::unique_ptr<clang::ASTConsumer> CVerifierFrontendAction::CreateASTConsumer(
 // ClangParser 实现
 // ============================================================================
 
-/**
- * @brief 自定义 FrontendActionFactory
- *
- * 用于创建 CVerifierFrontendAction 实例
- */
-class CVerifierActionFactory : public clang::tooling::FrontendActionFactory {
-public:
-    CVerifierActionFactory(LLIRModule* module) : module_(module) {}
-
-    std::unique_ptr<clang::FrontendAction> create() override {
-        return std::make_unique<CVerifierFrontendAction>(module_);
-    }
-
-    bool runInvocation(std::shared_ptr<clang::CompilerInvocation> Invocation,
-                      clang::FileManager* Files,
-                      std::shared_ptr<clang::PCHContainerOperations> PCHContainerOps,
-                      clang::DiagnosticConsumer* DiagConsumer) override {
-        return true;
-    }
-
-private:
-    LLIRModule* module_;
-};
-
 ClangParser::ClangParser() {
     utils::Logger::info("Clang parser initialized");
 }
@@ -749,15 +725,16 @@ LLIRModule* ClangParser::parseFile(
     args.push_back("-I/usr/include");
     args.push_back("-I/usr/local/include");
 
-    // 使用 clang::tooling::runToolOnCode 运行
-    // 创建工厂并进行类型转换
-    std::unique_ptr<clang::tooling::FrontendActionFactory> factory =
-        std::make_unique<CVerifierActionFactory>(module);
+    // 创建前端动作
+    auto action = std::make_unique<CVerifierFrontendAction>(module);
 
-    bool success = clang::tooling::runToolOnCode(
-        std::move(factory),
+    // 使用 clang::tooling::runToolOnCodeWithArgs 运行
+    // 这个版本接受 FrontendAction 和参数列表
+    bool success = clang::tooling::runToolOnCodeWithArgs(
+        std::move(action),
         code,
-        args
+        args,
+        filename
     );
 
     if (!success) {
