@@ -750,9 +750,12 @@ LLIRModule* ClangParser::parseFile(
     args.push_back("-I/usr/local/include");
 
     // 使用 clang::tooling::runToolOnCode 运行
-    // 注意：LLVM 15 的 runToolOnCode 需要特定的参数
+    // 创建工厂并进行类型转换
+    std::unique_ptr<clang::tooling::FrontendActionFactory> factory =
+        std::make_unique<CVerifierActionFactory>(module);
+
     bool success = clang::tooling::runToolOnCode(
-        std::make_unique<CVerifierActionFactory>(module),
+        std::move(factory),
         code,
         args
     );
