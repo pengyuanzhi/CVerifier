@@ -240,6 +240,14 @@ AbstractStore* IntervalTransferFunction::transfer(
     LLIRInstruction* inst,
     const AbstractStore* store
 ) const {
+    // 静态计数器用于生成唯一的变量名
+    static int varCounter = 0;
+
+    // 辅助函数：生成唯一变量名
+    auto freshVarName = [&varCounter](const std::string& prefix) -> std::string {
+        return prefix + "_" + std::to_string(varCounter++);
+    };
+
     // 克隆当前存储
     AbstractStore* newStore = store->clone();
 
