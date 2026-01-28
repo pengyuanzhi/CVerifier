@@ -217,10 +217,10 @@ std::string Z3Solver::getStatistics() const {
     oss << "  Timeout: " << timeout_ << "ms\n";
 
     try {
-        z3::stats stats = Z3_solver_get_statistics(ctx_, solver_);
-        oss << "  Statistics:\n";
-        // Z3统计信息格式化
-        Z3_stats_dec_ref(ctx_, stats);
+        Z3_stats z3Stats = Z3_solver_get_statistics(ctx_, solver_);
+        // 简化处理：不详细输出统计信息
+        Z3_stats_dec_ref(ctx_, z3Stats);
+        oss << "  Statistics available\n";
     } catch (...) {
         oss << "  Statistics: unavailable\n";
     }
@@ -278,9 +278,9 @@ z3::expr Z3Solver::convertToZ3(Expr* expr) {
                     case BinaryOpType::Xor:
                         return left ^ right;
                     case BinaryOpType::Shl:
-                        return z3::shl(left, static_cast<int>(Z3_get_numeral_int64(ctx_, right)));
+                        return z3::shl(left, right);
                     case BinaryOpType::Shr:
-                        return z3::ashr(left, static_cast<int>(Z3_get_numeral_int64(ctx_, right)));
+                        return z3::ashr(left, right);
                     case BinaryOpType::EQ:
                         return left == right;
                     case BinaryOpType::NE:
@@ -336,12 +336,13 @@ z3::expr Z3Solver::createZ3Constant(const std::string& name, ValueType type) {
             return ctx_.int_const(name.c_str());
         case ValueType::Float:
             // Z3使用浮点数理论
-            return ctx().real_const(name.c_str());
+            return ctx_.real_const(name.c_str());
         case ValueType::Pointer:
             // 指针作为整数处理
             return ctx_.int_const(name.c_str());
-        case ValueType::Boolean:
-            return ctx_.bool_const(name.c_str());
+        case ValueType::Void:
+            // Void 类型作为整数处理
+            return ctx_.int_const(name.c_str());
         default:
             return ctx_.int_const(name.c_str());
     }
