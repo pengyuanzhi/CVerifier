@@ -43,7 +43,7 @@ LLIRFunction* ASTToLLIRConverter::convertFunctionDecl(clang::FunctionDecl* funcD
     // 转换函数参数
     int paramIndex = 0;
     for (auto* param : funcDecl->parameters()) {
-        std::string paramName = param->getName().str();
+        std::string paramName = param->getName().getAsString();
         if (paramName.empty()) {
             paramName = "param_" + std::to_string(paramIndex);
         }
@@ -202,7 +202,7 @@ LLIRValue* ASTToLLIRConverter::convertExpr(clang::Expr* expr) {
                 );
             } else {
                 // 创建新的变量引用
-                std::string varName = varDecl->getName().str();
+                std::string varName = varDecl->getName().getAsString();
                 if (varName.empty()) {
                     varName = freshVarName("anon");
                 }
@@ -445,7 +445,7 @@ void ASTToLLIRConverter::convertVarDecl(clang::VarDecl* varDecl) {
         return;
     }
 
-    std::string varName = varDecl->getName().str();
+    std::string varName = varDecl->getName().getAsString();
     if (varName.empty()) {
         varName = freshVarName("anon");
     }
@@ -596,7 +596,7 @@ LLIRValue* ASTToLLIRConverter::convertCallExpr(clang::CallExpr* callExpr) {
     std::string functionName;
     if (auto* declRef = clang::dyn_cast<clang::DeclRefExpr>(callExpr->getCallee())) {
         if (auto* funcDecl = clang::dyn_cast<clang::FunctionDecl>(declRef->getDecl())) {
-            functionName = funcDecl->getNameInfo().getName().str();
+            functionName = funcDecl->getNameInfo().getName().getAsString();
         }
     }
 
