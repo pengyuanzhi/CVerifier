@@ -27,7 +27,9 @@ using core::LLIRFunction;
 using core::LLIRBasicBlock;
 using core::LLIRValue;
 using core::LLIRInstruction;
-using core::ValueType;
+using core::LLIRFactory;
+
+// ValueType 在 cverifier 命名空间中，不在 core 中
 
 // ============================================================================
 // AST 到 LLIR 转换器

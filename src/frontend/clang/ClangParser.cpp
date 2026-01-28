@@ -22,13 +22,13 @@ LLIRFunction* ASTToLLIRConverter::convertFunctionDecl(clang::FunctionDecl* funcD
         return nullptr;
     }
 
-    // 获取函数名
-    std::string funcName = funcDecl->getNameInfo().getName().str();
+    // 获取函数名（使用 getAsString() 替代已弃用的 str()）
+    std::string funcName = funcDecl->getNameInfo().getName().getAsString();
 
     utils::Logger::debug("Converting function: " + funcName);
 
     // 创建 LLIR 函数
-    auto* func = LLIRFactory::createFunction(funcName);
+    auto* func = core::LLIRFactory::createFunction(funcName);
     module_->addFunction(func);
 
     // 保存当前函数
@@ -52,7 +52,7 @@ LLIRFunction* ASTToLLIRConverter::convertFunctionDecl(clang::FunctionDecl* funcD
         varMap_[param] = paramName;
 
         // 创建 LLIR 参数（实际在LLIR中用变量表示）
-        auto* paramVar = LLIRFactory::createVariable(
+        auto* paramVar = core::LLIRFactory::createVariable(
             paramName,
             convertType(param->getType()),
             paramIndex
@@ -73,7 +73,7 @@ LLIRFunction* ASTToLLIRConverter::convertFunctionDecl(clang::FunctionDecl* funcD
 
 void ASTToLLIRConverter::convertFunctionBody(
     clang::FunctionDecl* funcDecl,
-    LLIRFunction* func
+    LLIRFunction* /* func */
 ) {
     if (!funcDecl->hasBody()) {
         return;
@@ -102,12 +102,16 @@ void ASTToLLIRConverter::convertStmt(clang::Stmt* stmt) {
 
     // 获取源代码位置
     SourceLocation loc;
-    auto& sm = currentFunction_->getModule()->getSourceManager();
+    // TODO: 需要访问 SourceManager，当前暂时跳过
+    // auto& sm = /* getModule()->getSourceManager() */;
     auto clangLoc = stmt->getBeginLoc();
     if (clangLoc.isValid()) {
-        loc.file = sm.getFilename(clangLoc).str();
-        loc.line = sm.getSpellingLineNumber(clangLoc);
-        loc.column = sm.getSpellingColumnNumber(clangLoc);
+        // loc.file = sm.getFilename(clangLoc).str();
+        // loc.line = sm.getSpellingLineNumber(clangLoc);
+        // loc.column = sm.getSpellingColumnNumber(clangLoc);
+        loc.file = "unknown";
+        loc.line = 0;
+        loc.column = 0;
     }
 
     // 根据语句类型转换
@@ -173,17 +177,17 @@ LLIRValue* ASTToLLIRConverter::convertExpr(clang::Expr* expr) {
     // 整数常量
     if (auto* intLiteral = clang::dyn_cast<clang::IntegerLiteral>(expr)) {
         llvm::APInt value = intLiteral->getValue();
-        return LLIRFactory::createIntConstant(value.getLimitedValue());
+        return core::LLIRFactory::createIntConstant(value.getLimitedValue());
     }
 
     // 浮点常量
     if (auto* floatLiteral = clang::dyn_cast<clang::FloatingLiteral>(expr)) {
-        return LLIRFactory::createFloatConstant(floatLiteral->getValueAsApproximateDouble());
+        return core::LLIRFactory::createFloatConstant(floatLiteral->getValueAsApproximateDouble());
     }
 
     // 字符常量
     if (auto* charLiteral = clang::dyn_cast<clang::CharacterLiteral>(expr)) {
-        return LLIRFactory::createIntConstant(charLiteral->getValue());
+        return core::LLIRFactory::createIntConstant(charLiteral->getValue());
     }
 
     // 声明引用（变量引用）
@@ -192,7 +196,7 @@ LLIRValue* ASTToLLIRConverter::convertExpr(clang::Expr* expr) {
             auto it = varMap_.find(varDecl);
             if (it != varMap_.end()) {
                 // 返回已存在的变量
-                return LLIRFactory::createVariable(
+                return core::LLIRFactory::createVariable(
                     it->second,
                     convertType(varDecl->getType())
                 );
@@ -203,7 +207,7 @@ LLIRValue* ASTToLLIRConverter::convertExpr(clang::Expr* expr) {
                     varName = freshVarName("anon");
                 }
                 varMap_[varDecl] = varName;
-                return LLIRFactory::createVariable(
+                return core::LLIRFactory::createVariable(
                     varName,
                     convertType(varDecl->getType())
                 );
@@ -270,8 +274,12 @@ void ASTToLLIRConverter::convertIfStmt(clang::IfStmt* ifStmt) {
     auto* mergeBB = createBasicBlock("if.end");
 
     // 创建条件分支指令
-    auto* brInst = LLIRFactory::createConditionalBr(condition, thenBB, elseBB,
-        ifStmt->getIfLoc().printToString(currentFunction_->getModule()->getSourceManager()));
+    // TODO: 需要SourceManager来获取准确的源代码位置
+    SourceLocation loc;
+    loc.file = "unknown";
+    loc.line = 0;
+    loc.column = 0;
+    auto* brInst = core::LLIRFactory::createConditionalBr(condition, thenBB, elseBB, loc);
     currentBB_->addInstruction(brInst);
 
     currentFunction_->addBasicBlock(thenBB);
@@ -285,7 +293,7 @@ void ASTToLLIRConverter::convertIfStmt(clang::IfStmt* ifStmt) {
     // then 分支结束后跳转到 merge
     if (currentBB_->getInstructions().empty() ||
         currentBB_->getInstructions().back()->getType() != LLIRInstructionType::Br) {
-        auto* thenMerge = LLIRFactory::createBr(mergeBB);
+        auto* thenMerge = core::LLIRFactory::createBr(mergeBB);
         currentBB_->addInstruction(thenMerge);
     }
 
@@ -298,7 +306,7 @@ void ASTToLLIRConverter::convertIfStmt(clang::IfStmt* ifStmt) {
     // else 分支结束后跳转到 merge
     if (currentBB_->getInstructions().empty() ||
         currentBB_->getInstructions().back()->getType() != LLIRInstructionType::Br) {
-        auto* elseMerge = LLIRFactory::createBr(mergeBB);
+        auto* elseMerge = core::LLIRFactory::createBr(mergeBB);
         currentBB_->addInstruction(elseMerge);
     }
 
@@ -319,7 +327,7 @@ void ASTToLLIRConverter::convertWhileStmt(clang::WhileStmt* whileStmt) {
     auto* endBB = createBasicBlock("while.end");
 
     // 当前基本块跳转到条件检查块
-    auto* toCond = LLIRFactory::createBr(condBB);
+    auto* toCond = core::LLIRFactory::createBr(condBB);
     currentBB_->addInstruction(toCond);
 
     currentFunction_->addBasicBlock(condBB);
@@ -331,8 +339,8 @@ void ASTToLLIRConverter::convertWhileStmt(clang::WhileStmt* whileStmt) {
     LLIRValue* condition = convertExpr(whileStmt->getCond());
 
     // 创建条件分支
-    auto* brInst = LLIRFactory::createConditionalBr(condition, bodyBB, endBB,
-        whileStmt->getWhileLoc().printToString(currentFunction_->getModule()->getSourceManager()));
+    auto* brInst = core::LLIRFactory::createConditionalBr(condition, bodyBB, endBB,
+        whileStmt->getWhileLoc());
     currentBB_->addInstruction(brInst);
 
     // 转换循环体
@@ -342,7 +350,7 @@ void ASTToLLIRConverter::convertWhileStmt(clang::WhileStmt* whileStmt) {
     // 循环体结束后跳回条件检查
     if (currentBB_->getInstructions().empty() ||
         currentBB_->getInstructions().back()->getType() != LLIRInstructionType::Br) {
-        auto* backToCond = LLIRFactory::createBr(condBB);
+        auto* backToCond = core::LLIRFactory::createBr(condBB);
         currentBB_->addInstruction(backToCond);
     }
 
@@ -369,7 +377,7 @@ void ASTToLLIRConverter::convertForStmt(clang::ForStmt* forStmt) {
     auto* endBB = createBasicBlock("for.end");
 
     // 跳转到条件检查
-    auto* toCond = LLIRFactory::createBr(condBB);
+    auto* toCond = core::LLIRFactory::createBr(condBB);
     currentBB_->addInstruction(toCond);
 
     currentFunction_->addBasicBlock(condBB);
@@ -381,12 +389,12 @@ void ASTToLLIRConverter::convertForStmt(clang::ForStmt* forStmt) {
     setCurrentBasicBlock(condBB);
     if (forStmt->getCond()) {
         LLIRValue* condition = convertExpr(forStmt->getCond());
-        auto* brInst = LLIRFactory::createConditionalBr(condition, bodyBB, endBB,
-            forStmt->getForLoc().printToString(currentFunction_->getModule()->getSourceManager()));
+        auto* brInst = core::LLIRFactory::createConditionalBr(condition, bodyBB, endBB,
+            forStmt->getForLoc());
         currentBB_->addInstruction(brInst);
     } else {
         // 无条件：总是进入循环体
-        auto* brInst = LLIRFactory::createBr(bodyBB);
+        auto* brInst = core::LLIRFactory::createBr(bodyBB);
         currentBB_->addInstruction(brInst);
     }
 
@@ -397,7 +405,7 @@ void ASTToLLIRConverter::convertForStmt(clang::ForStmt* forStmt) {
     // 循环体结束后跳到增量
     if (currentBB_->getInstructions().empty() ||
         currentBB_->getInstructions().back()->getType() != LLIRInstructionType::Br) {
-        auto* toInc = LLIRFactory::createBr(incBB);
+        auto* toInc = core::LLIRFactory::createBr(incBB);
         currentBB_->addInstruction(toInc);
     }
 
@@ -408,7 +416,7 @@ void ASTToLLIRConverter::convertForStmt(clang::ForStmt* forStmt) {
     }
 
     // 增量后跳回条件检查
-    auto* backToCond = LLIRFactory::createBr(condBB);
+    auto* backToCond = core::LLIRFactory::createBr(condBB);
     currentBB_->addInstruction(backToCond);
 
     // 设置 end 为当前基本块
@@ -427,8 +435,8 @@ void ASTToLLIRConverter::convertReturnStmt(clang::ReturnStmt* retStmt) {
         returnValue = convertExpr(retStmt->getRetValue());
     }
 
-    auto* retInst = LLIRFactory::createRet(returnValue,
-        retStmt->getReturnLoc().printToString(currentFunction_->getModule()->getSourceManager()));
+    auto* retInst = core::LLIRFactory::createRet(returnValue,
+        retStmt->getReturnLoc());
     currentBB_->addInstruction(retInst);
 }
 
@@ -474,31 +482,31 @@ LLIRValue* ASTToLLIRConverter::convertBinaryOperator(clang::BinaryOperator* binO
     // 创建对应的 LLIR 指令
     switch (opcode) {
         case clang::BO_Add:
-            return LLIRFactory::createAdd(left, right);
+            return core::LLIRFactory::createAdd(left, right);
         case clang::BO_Sub:
-            return LLIRFactory::createSub(left, right);
+            return core::LLIRFactory::createSub(left, right);
         case clang::BO_Mul:
-            return LLIRFactory::createMul(left, right);
+            return core::LLIRFactory::createMul(left, right);
         case clang::BO_Div:
-            return LLIRFactory::createDiv(left, right);
+            return core::LLIRFactory::createDiv(left, right);
         case clang::BO_Rem:
-            return LLIRFactory::createRem(left, right);
+            return core::LLIRFactory::createRem(left, right);
         case clang::BO_EQ:
-            return LLIRFactory::createICmp(left, right);
+            return core::LLIRFactory::createICmp(left, right);
         case clang::BO_NE:
-            return LLIRFactory::createICmp(left, right);
+            return core::LLIRFactory::createICmp(left, right);
         case clang::BO_LT:
-            return LLIRFactory::createICmp(left, right);
+            return core::LLIRFactory::createICmp(left, right);
         case clang::BO_GT:
-            return LLIRFactory::createICmp(left, right);
+            return core::LLIRFactory::createICmp(left, right);
         case clang::BO_LE:
-            return LLIRFactory::createICmp(left, right);
+            return core::LLIRFactory::createICmp(left, right);
         case clang::BO_GE:
-            return LLIRFactory::createICmp(left, right);
+            return core::LLIRFactory::createICmp(left, right);
         case clang::BO_LAnd:
-            return LLIRFactory::createAnd(left, right);
+            return core::LLIRFactory::createAnd(left, right);
         case clang::BO_LOr:
-            return LLIRFactory::createOr(left, right);
+            return core::LLIRFactory::createOr(left, right);
         case clang::BO_Assign: {
             // 赋值操作：需要特殊处理
             // 获取左值的变量名
@@ -529,8 +537,8 @@ LLIRValue* ASTToLLIRConverter::convertUnaryOperator(clang::UnaryOperator* unaryO
 
     switch (opcode) {
         case clang::UO_Minus:
-            return LLIRFactory::createSub(
-                LLIRFactory::createIntConstant(0),
+            return core::LLIRFactory::createSub(
+                core::LLIRFactory::createIntConstant(0),
                 operand
             );
         case clang::UO_Not:
@@ -539,8 +547,8 @@ LLIRValue* ASTToLLIRConverter::convertUnaryOperator(clang::UnaryOperator* unaryO
             return operand;
         case clang::UO_Deref: {
             // 解引用操作：load
-            auto* loadInst = LLIRFactory::createLoad(operand,
-                unaryOp->getExprLoc().printToString(currentFunction_->getModule()->getSourceManager()));
+            auto* loadInst = core::LLIRFactory::createLoad(operand,
+                unaryOp->getExprLoc());
             currentBB_->addInstruction(loadInst);
             return operand;
         }
@@ -567,13 +575,13 @@ LLIRValue* ASTToLLIRConverter::convertArraySubscriptExpr(clang::ArraySubscriptEx
     }
 
     // 创建 GEP 指令
-    auto* gepInst = LLIRFactory::createGetElementPtr(base, index,
-        arraySub->getExprLoc().printToString(currentFunction_->getModule()->getSourceManager()));
+    auto* gepInst = core::LLIRFactory::createGetElementPtr(base, index,
+        arraySub->getExprLoc());
     currentBB_->addInstruction(gepInst);
 
     // 创建 load 指令（获取数组元素）
-    auto* loadInst = LLIRFactory::createLoad(gepInst,
-        arraySub->getExprLoc().printToString(currentFunction_->getModule()->getSourceManager()));
+    auto* loadInst = core::LLIRFactory::createLoad(gepInst,
+        arraySub->getExprLoc());
     currentBB_->addInstruction(loadInst);
 
     return base;
@@ -606,11 +614,11 @@ LLIRValue* ASTToLLIRConverter::convertCallExpr(clang::CallExpr* callExpr) {
     }
 
     // 创建 call 指令
-    auto* callInst = LLIRFactory::createCall(functionName, args,
-        callExpr->getExprLoc().printToString(currentFunction_->getModule()->getSourceManager()));
+    auto* callInst = core::LLIRFactory::createCall(functionName, args,
+        callExpr->getExprLoc());
     currentBB_->addInstruction(callInst);
 
-    return LLIRFactory::createVariable(
+    return core::LLIRFactory::createVariable(
         freshVarName("call_result"),
         ValueType::Integer
     );
@@ -644,7 +652,7 @@ LLIRBasicBlock* ASTToLLIRConverter::createBasicBlock(const std::string& name) {
         uniqueName = name + "_" + std::to_string(suffix++);
     }
 
-    return LLIRFactory::createBasicBlock(uniqueName);
+    return core::LLIRFactory::createBasicBlock(uniqueName);
 }
 
 void ASTToLLIRConverter::setCurrentBasicBlock(LLIRBasicBlock* bb) {
@@ -702,7 +710,7 @@ LLIRModule* ClangParser::parseFile(
     utils::Logger::info("Parsing file: " + filename);
 
     // 创建 LLIR 模块
-    auto* module = LLIRFactory::createModule(filename);
+    auto* module = core::LLIRFactory::createModule(filename);
 
     // 准备编译参数
     std::vector<std::string> args;
