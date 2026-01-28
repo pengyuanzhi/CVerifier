@@ -510,6 +510,11 @@ public:
     }
 
     /**
+     * @brief 生成唯一的变量名
+     */
+    std::string freshVarName(const std::string& prefix = "var");
+
+    /**
      * @brief 获取统计信息
      */
     std::string getStatistics() const;
@@ -520,6 +525,7 @@ private:
     std::unordered_map<std::string, AbstractStore*> results_;
     int functionsAnalyzed_;
     double analysisTime_;
+    int varCounter_ = 0;  ///< 用于生成唯一变量名的计数器
 };
 
 } // namespace core

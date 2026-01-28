@@ -420,6 +420,10 @@ AbstractInterpreter::~AbstractInterpreter() {
     }
 }
 
+std::string AbstractInterpreter::freshVarName(const std::string& prefix) {
+    return prefix + "_" + std::to_string(varCounter_++);
+}
+
 void AbstractInterpreter::analyzeFunction(const std::string& functionName) {
     utils::Logger::info("Analyzing function with abstract interpretation: " + functionName);
 
