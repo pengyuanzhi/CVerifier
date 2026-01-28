@@ -5,6 +5,7 @@
 #include "cverifier/SymbolicState.h"
 #include "cverifier/CFG.h"
 #include "cverifier/Core.h"
+#include "cverifier/Utils.h"
 #include <memory>
 #include <queue>
 #include <stack>
