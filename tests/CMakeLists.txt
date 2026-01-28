@@ -33,7 +33,10 @@ endif()
 # 集成测试（不需要GTest）
 function(add_integration_test name source)
     add_executable(${name} ${source})
-    target_link_libraries(${name} cverifier)
+    target_link_libraries(${name}
+        cverifier-core
+        cverifier-analyzer
+    )
 
     add_test(NAME ${name} COMMAND ${name})
 endfunction()
