@@ -15,25 +15,17 @@ namespace core {
 // Z3Solver 实现
 // ============================================================================
 
-Z3Solver::Z3Solver() : timeout_(5000) {
+Z3Solver::Z3Solver()
 #ifdef HAVE_Z3
-    // 配置Z3
-    z3::config config;
-
+    : ctx_(z3::config()), solver_(ctx_, "QF_LIA")
+#endif
+    , timeout_(5000) {
+#ifdef HAVE_Z3
     // 设置超时
     if (timeout_ > 0) {
-        config.set("timeout", static_cast<unsigned>(timeout_));
+        Z3_set_param_value(Z3_solver_get_params(ctx_, solver_), "timeout",
+                           std::to_string(timeout_).c_str());
     }
-
-    // 启用模型
-    config.set("model", true);
-
-    // 设置求解器策略
-    config.set("auto_config", true);
-
-    // 创建上下文和求解器
-    ctx_ = z3::context(config);
-    solver_ = z3::solver(ctx_, "QF_LIA");  // 线性整数算术理论
 
     utils::Logger::debug("Z3 solver initialized successfully");
 #else
@@ -68,7 +60,7 @@ SolverResult Z3Solver::check(const PathConstraint* constraints) {
 
         // 转换结果
         switch (result) {
-            case z3::sat:
+            case z3::sat: {
                 // 提取模型
                 z3::model model = solver_.get_model();
                 lastModel_.intValues.clear();
@@ -91,6 +83,7 @@ SolverResult Z3Solver::check(const PathConstraint* constraints) {
                 }
 
                 return SolverResult::Sat;
+            }
 
             case z3::unsat:
                 return SolverResult::Unsat;
