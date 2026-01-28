@@ -21,6 +21,14 @@
 namespace cverifier {
 namespace frontend {
 
+// 引入 core 命名空间的类型
+using core::LLIRModule;
+using core::LLIRFunction;
+using core::LLIRBasicBlock;
+using core::LLIRValue;
+using core::LLIRInstruction;
+using core::ValueType;
+
 // ============================================================================
 // AST 到 LLIR 转换器
 // ============================================================================
