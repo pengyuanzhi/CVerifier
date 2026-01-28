@@ -726,10 +726,8 @@ LLIRModule* ClangParser::parseFile(
     args.push_back("-I/usr/include");
     args.push_back("-I/usr/local/include");
 
-    // 创建前端动作
-    auto* action = new CVerifierFrontendAction(module);
-
     // 运行 Clang 工具
+    // 在 LLVM 15+ 中，使用新的 API
     llvm::Expected<clang::tooling::CommonOptionsParser> optParser =
         clang::tooling::CommonOptionsParser::create(
             args.size(),
@@ -741,16 +739,20 @@ LLIRModule* ClangParser::parseFile(
         lastError_ = "Failed to create options parser";
         utils::Logger::error(lastError_);
         delete module;
-        delete action;
         return nullptr;
     }
 
     clang::tooling::ClangTool tool(optParser->getCompilations(),
                                    optParser->getSourcePathList());
 
-    int result = tool.run(clang::tooling::newFrontendActionFactory(action).get());
-
-    delete action;
+    // 使用 lambda 工厂创建 FrontendAction
+    int result = tool.run(
+        clang::tooling::newFrontendActionFactory(
+            [module]() -> std::unique_ptr<clang::FrontendAction> {
+                return std::make_unique<CVerifierFrontendAction>(module);
+            }
+        ).get()
+    );
 
     if (result != 0) {
         lastError_ = "Clang tool execution failed";
