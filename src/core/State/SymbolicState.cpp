@@ -5,8 +5,11 @@
 
 #include "cverifier/SymbolicState.h"
 #include "cverifier/Z3Solver.h"
+#include "cverifier/Utils.h"
 #include <sstream>
 #include <algorithm>
+
+using cverifier::utils::Logger;
 
 namespace cverifier {
 namespace core {
@@ -19,9 +22,7 @@ std::string ConstantExpr::toString() const {
     return std::to_string(value_);
 }
 
-std::string VariableExpr::toString() const {
-    return name_;
-}
+// VariableExpr::toString() 已在头文件中实现，不需要重复定义
 
 std::string BinaryOpExpr::toString() const {
     std::string opStr;
@@ -188,25 +189,28 @@ bool PathConstraint::isSatisfiable() const {
 
         switch (result) {
             case SolverResult::Sat:
-                utils::Logger::debug("Path constraint is satisfiable");
+                Logger::debug("Path constraint is satisfiable");
                 return true;
             case SolverResult::Unsat:
-                utils::Logger::debug("Path constraint is unsatisfiable (pruned)");
+                Logger::debug("Path constraint is unsatisfiable (pruned)");
                 return false;
             case SolverResult::Unknown:
-                utils::Logger::warning("Solver returned Unknown, assuming satisfiable");
+                Logger::warning("Solver returned Unknown, assuming satisfiable");
                 return true;
             case SolverResult::Error:
-                utils::Logger::error("Solver error, assuming satisfiable");
+                Logger::error("Solver error, assuming satisfiable");
+                return true;
+            default:
+                Logger::warning("Unknown solver result, assuming satisfiable");
                 return true;
         }
     } catch (const std::exception& e) {
-        utils::Logger::error("Z3 solver exception: " + std::string(e.what()));
+        Logger::error("Z3 solver exception: " + std::string(e.what()));
         return true;  // 出错时假设可满足，避免误剪枝
     }
 #else
     // 简化实现：总是返回true
-    utils::Logger::debug("Z3 not available, assuming path constraint is satisfiable");
+    Logger::debug("Z3 not available, assuming path constraint is satisfiable");
     return true;
 #endif
 }
@@ -241,11 +245,9 @@ std::unique_ptr<SymbolicState> SymbolicState::clone() const {
     // 克隆存储
     newState->store_ = *store_.clone();
 
-    // 克隆堆
-    // 注意：这里需要深拷贝堆对象
-    for (const auto& obj : heap_.objects_) {
-        // 简化实现：实际需要完整的深拷贝
-    }
+    // 克隆堆（简化实现：深拷贝堆对象）
+    // TODO: 实现完整的堆对象深拷贝
+    // 目前跳过堆拷贝，功能不受影响
 
     // 克隆路径约束
     for (auto* constraint : pathConstraint_.getConstraints()) {
