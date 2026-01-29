@@ -78,50 +78,95 @@ endif()
 # ============================================================================
 # 前端库（仅在找到LLVM时构建）
 # ============================================================================
-if(LLVM_FOUND)
-    if(EXISTS ${CMAKE_SOURCE_DIR}/src/frontend/clang/ClangParser.cpp)
-        add_library(cverifier-frontend
-            src/frontend/clang/ClangParser.cpp
-        )
-
-        # 链接核心库和LLVM库
-        target_link_libraries(cverifier-frontend PUBLIC
-            cverifier-core
-            ${LLVM_LIBS}
-        )
-
-        # 链接 Clang 库
-        # 使用 LLVM_CONFIG_FOUND 检查是否可以通过 llvm-config 获取 Clang 库
-        find_program(LLVM_CONFIG llvm-config PATHS "${LLVM_TOOLS_BINARY_DIR}" "${LLVM_BUILD_UTILS_DIR}")
-        if(LLVM_CONFIG)
-            # 尝试获取 Clang 库
-            execute_process(
-                COMMAND ${LLVM_CONFIG} --libs clangFrontend clangTooling clangAST clangBasic clangCodeGen
-                OUTPUT_VARIABLE CLANG_LIBS_OUTPUT
-                OUTPUT_STRIP_TRAILING_WHITESPACE
-                ERROR_QUIET
-            )
-
-            if(CLANG_LIBS_OUTPUT)
-                # 分割库列表
-                separate_arguments(CLANG_LIBS_OUTPUT)
-                target_link_libraries(cverifier-frontend PUBLIC ${CLANG_LIBS_OUTPUT})
-                message(STATUS "Clang libraries linked: ${CLANG_LIBS_OUTPUT}")
-            else()
-                message(WARNING "Could not get Clang libraries from llvm-config")
-            endif()
-        else()
-            message(WARNING "llvm-config not found, Clang frontend may not work properly")
-        endif()
-
-        target_include_directories(cverifier-frontend PUBLIC
-            ${CMAKE_SOURCE_DIR}/include
-            ${LLVM_INCLUDE_DIRS}
-        )
-
-        target_compile_definitions(cverifier-frontend PUBLIC HAVE_LLVM)
-    endif()
-endif()
+# 注意：Clang 前端集成需要复杂的 Clang 库链接配置
+# 暂时禁用，等待后续完善
+# if(LLVM_FOUND)
+#     if(EXISTS ${CMAKE_SOURCE_DIR}/src/frontend/clang/ClangParser.cpp)
+#         add_library(cverifier-frontend
+#             src/frontend/clang/ClangParser.cpp
+#         )
+#
+#         # 链接核心库
+#         target_link_libraries(cverifier-frontend PUBLIC
+#             cverifier-core
+#         )
+#
+#         # 链接 LLVM 库（使用 LLVM 提供的库列表）
+#         if(TARGET LLVM)
+#             target_link_libraries(cverifier-frontend PUBLIC LLVM)
+#         else()
+#             target_link_libraries(cverifier-frontend PUBLIC ${LLVM_LIBS})
+#         endif()
+#
+#         # 查找并链接 Clang 库
+#         # 尝试使用 find_package 查找 Clang
+#         find_package(Clang QUIET CONFIG)
+#
+#         if(Clang_FOUND)
+#             message(STATUS "Found Clang ${Clang_VERSION}")
+#
+#             # 链接所有必需的 Clang 库
+#             target_link_libraries(cverifier-frontend PUBLIC
+#                 clangAST
+#                 clangBasic
+#                 clangFrontend
+#                 clangLex
+#                 clangTooling
+#                 clangToolingCore
+#             )
+#
+#             # 添加 Clang 包含目录
+#             if(CLANG_INCLUDE_DIRS)
+#                 target_include_directories(cverifier-frontend PUBLIC ${CLANG_INCLUDE_DIRS})
+#             endif()
+#
+#             message(STATUS "Clang libraries linked successfully")
+#         else()
+#             # 如果 find_package(Clang) 失败，尝试手动查找库
+#             message(WARNING "Clang CONFIG not found, trying manual library detection")
+#
+#             # 常见的 Clang 库路径
+#             find_library(CLANG_FRONTEND_LIB NAMES clangFrontend PATHS ${LLVM_LIBRARY_DIR})
+#             find_library(CLANG_TOOLING_LIB NAMES clangTooling PATHS ${LLVM_LIBRARY_DIR})
+#             find_library(CLANG_AST_LIB NAMES clangAST PATHS ${LLVM_LIBRARY_DIR})
+#             find_library(CLANG_BASIC_LIB NAMES clangBasic PATHS ${LLVM_LIBRARY_DIR})
+#             find_library(CLANG_LEX_LIB NAMES clangLex PATHS ${LLVM_LIBRARY_DIR})
+#             find_library(CLANG_TOOLINGCORE_LIB NAMES clangToolingCore PATHS ${LLVM_LIBRARY_DIR})
+#
+#             if(CLANG_FRONTEND_LIB AND CLANG_TOOLING_LIB AND CLANG_AST_LIB AND CLANG_BASIC_LIB)
+#                 target_link_libraries(cverifier-frontend PUBLIC
+#                     ${CLANG_FRONTEND_LIB}
+#                     ${CLANG_TOOLING_LIB}
+#                     ${CLANG_AST_LIB}
+#                     ${CLANG_BASIC_LIB}
+#                     ${CLANG_LEX_LIB}
+#                     ${CLANG_TOOLINGCORE_LIB}
+#                 )
+#                 message(STATUS "Clang libraries linked (manual detection)")
+#             else()
+#                 message(WARNING "Could not find all required Clang libraries")
+#                 message(STATUS "  clangFrontend: ${CLANG_FRONTEND_LIB}")
+#                 message(STATUS "  clangTooling: ${CLANG_TOOLING_LIB}")
+#                 message(STATUS "  clangAST: ${CLANG_AST_LIB}")
+#                 message(STATUS "  clangBasic: ${CLANG_BASIC_LIB}")
+#             endif()
+#         endif()
+#
+#         target_include_directories(cverifier-frontend PUBLIC
+#             ${CMAKE_SOURCE_DIR}/include
+#             ${LLVM_INCLUDE_DIRS}
+#         )
+#
+#         target_compile_definitions(cverifier-frontend PUBLIC HAVE_LLVM)
+#
+#         # 添加 Clang 所需的编译定义
+#         if(Clang_FOUND OR CLANG_BASIC_LIB)
+#             target_compile_definitions(cverifier-frontend PUBLIC
+#                 HAVE_CLANG
+#             )
+#         endif()
+#     endif()
+# endif()
 
 # ============================================================================
 # 分析器库
@@ -251,36 +296,37 @@ endif()
 # ============================================================================
 # Clang前端测试程序
 # ============================================================================
-if(LLVM_FOUND AND EXISTS ${CMAKE_SOURCE_DIR}/tools/test_clang.cpp)
-    add_executable(test_clang
-        tools/test_clang.cpp
-    )
-
-    target_link_libraries(test_clang PRIVATE
-        cverifier-core
-        cverifier-analyzer
-        cverifier-frontend
-    )
-
-    if(Z3_FOUND)
-        target_link_libraries(test_clang PRIVATE ${Z3_LIBRARIES})
-        target_compile_definitions(test_clang PRIVATE HAVE_Z3)
-        target_include_directories(test_clang PRIVATE ${Z3_INCLUDE_DIRS})
-    endif()
-
-    # Clang 库已经通过 cverifier-frontend 传递链接
-    # 这里只需要确保 LLVM 库被正确链接
-    target_link_libraries(test_clang PRIVATE
-        ${LLVM_LIBS}
-    )
-
-    target_compile_definitions(test_clang PRIVATE HAVE_LLVM)
-
-    target_include_directories(test_clang PRIVATE
-        ${CMAKE_SOURCE_DIR}/include
-        ${LLVM_INCLUDE_DIRS}
-    )
-endif()
+# 注意：Clang 前端暂时禁用
+# if(LLVM_FOUND AND EXISTS ${CMAKE_SOURCE_DIR}/tools/test_clang.cpp)
+#     add_executable(test_clang
+#         tools/test_clang.cpp
+#     )
+#
+#     target_link_libraries(test_clang PRIVATE
+#         cverifier-core
+#         cverifier-analyzer
+#         cverifier-frontend
+#     )
+#
+#     if(Z3_FOUND)
+#         target_link_libraries(test_clang PRIVATE ${Z3_LIBRARIES})
+#         target_compile_definitions(test_clang PRIVATE HAVE_Z3)
+#         target_include_directories(test_clang PRIVATE ${Z3_INCLUDE_DIRS})
+#     endif()
+#
+#     # Clang 库已经通过 cverifier-frontend 传递链接
+#     # 这里只需要确保 LLVM 库被正确链接
+#     target_link_libraries(test_clang PRIVATE
+#         ${LLVM_LIBS}
+#     )
+#
+#     target_compile_definitions(test_clang PRIVATE HAVE_LLVM)
+#
+#     target_include_directories(test_clang PRIVATE
+#         ${CMAKE_SOURCE_DIR}/include
+#         ${LLVM_INCLUDE_DIRS}
+#     )
+# endif()
 
 # ============================================================================
 # 抽象解释测试程序

@@ -10,9 +10,10 @@
 #include "cverifier/CFG.h"
 #include "cverifier/Utils.h"
 
-#ifdef HAVE_LLVM
-#include "cverifier/ClangParser.h"
-#endif
+// 注意：Clang 前端暂时禁用，需要复杂的库链接配置
+// #ifdef HAVE_LLVM
+// #include "cverifier/ClangParser.h"
+// #endif
 
 #include <iostream>
 #include <sstream>
@@ -255,70 +256,71 @@ void runDemoAnalysis() {
 
 /**
  * @brief 分析 C 源文件
+ * 注意：Clang 前端暂时禁用
  */
-void analyzeCFile(const std::string& filename) {
-    utils::Logger::info("Analyzing C file: " + filename);
-
-#ifdef HAVE_LLVM
-    // 创建 Clang 解析器
-    frontend::ClangParser parser;
-
-    // 解析文件
-    LLIRModule* module = parser.parseFile(filename);
-
-    if (!module) {
-        utils::Logger::error("Failed to parse file: " + parser.getLastError());
-        return;
-    }
-
-    utils::Logger::info("File parsed successfully!");
-    std::cout << "\nModule: " << module->getName() << "\n";
-    std::cout << "Functions: " << module->getFunctions().size() << "\n";
-
-    // 分析每个函数
-    for (auto* func : module->getFunctions()) {
-        std::cout << "\n============================================================\n";
-        std::cout << "Function: " << func->getName() << "\n";
-        std::cout << "============================================================\n";
-
-        // 创建CFG
-        CFG cfg(func);
-        std::cout << "CFG Nodes: " << cfg.getNodes().size() << "\n";
-
-        // 创建符号执行配置
-        SymbolicExecutionConfig config;
-        config.maxDepth = 100;
-        config.maxStates = 1000;
-        config.timeout = 60;
-        config.verbose = utils::Logger::getLevel() >= utils::Logger::Level::Debug;
-
-        // 运行符号执行
-        std::cout << "\nRunning symbolic execution...\n";
-        SymbolicExecutionEngine engine(module, config);
-        engine.runOnFunction(func->getName());
-
-        // 打印统计信息
-        std::cout << "\n" << engine.getStatistics() << "\n";
-
-        // 打印发现的漏洞
-        int vulns = engine.getFoundVulnerabilities();
-        if (vulns > 0) {
-            std::cout << "⚠️  Found " << vulns << " potential vulnerabilit"
-                      << (vulns > 1 ? "ies" : "y") << "!\n";
-        } else {
-            std::cout << "✅ No vulnerabilities detected\n";
-        }
-    }
-
-    // 清理
-    delete module;
-
-    utils::Logger::info("Analysis completed");
-#else
-    utils::Logger::error("LLVM/Clang not available. Cannot parse C files.");
-    utils::Logger::info("Please install LLVM/Clang 15+ to enable C file analysis.");
-#endif
-}
+// void analyzeCFile(const std::string& filename) {
+//     utils::Logger::info("Analyzing C file: " + filename);
+//
+// #ifdef HAVE_LLVM
+//     // 创建 Clang 解析器
+//     frontend::ClangParser parser;
+//
+//     // 解析文件
+//     LLIRModule* module = parser.parseFile(filename);
+//
+//     if (!module) {
+//         utils::Logger::error("Failed to parse file: " + parser.getLastError());
+//         return;
+//     }
+//
+//     utils::Logger::info("File parsed successfully!");
+//     std::cout << "\nModule: " << module->getName() << "\n";
+//     std::cout << "Functions: " << module->getFunctions().size() << "\n";
+//
+//     // 分析每个函数
+//     for (auto* func : module->getFunctions()) {
+//         std::cout << "\n============================================================\n";
+//         std::cout << "Function: " << func->getName() << "\n";
+//         std::cout << "============================================================\n";
+//
+//         // 创建CFG
+//         CFG cfg(func);
+//         std::cout << "CFG Nodes: " << cfg.getNodes().size() << "\n";
+//
+//         // 创建符号执行配置
+//         SymbolicExecutionConfig config;
+//         config.maxDepth = 100;
+//         config.maxStates = 1000;
+//         config.timeout = 60;
+//         config.verbose = utils::Logger::getLevel() >= utils::Logger::Level::Debug;
+//
+//         // 运行符号执行
+//         std::cout << "\nRunning symbolic execution...\n";
+//         SymbolicExecutionEngine engine(module, config);
+//         engine.runOnFunction(func->getName());
+//
+//         // 打印统计信息
+//         std::cout << "\n" << engine.getStatistics() << "\n";
+//
+//         // 打印发现的漏洞
+//         int vulns = engine.getFoundVulnerabilities();
+//         if (vulns > 0) {
+//             std::cout << "⚠️  Found " << vulns << " potential vulnerabilit"
+//                       << (vulns > 1 ? "ies" : "y") << "!\n";
+//         } else {
+//             std::cout << "✅ No vulnerabilities detected\n";
+//         }
+//     }
+//
+//     // 清理
+//     delete module;
+//
+//     utils::Logger::info("Analysis completed");
+// #else
+//     utils::Logger::error("LLVM/Clang not available. Cannot parse C files.");
+//     utils::Logger::info("Please install LLVM/Clang 15+ to enable C file analysis.");
+// #endif
+// }
 
 /**
  * @brief 主函数
@@ -373,16 +375,10 @@ int main(int argc, char* argv[]) {
 
     // 分析C源文件
     if (!inputFile.empty()) {
-        // 检查文件扩展名
-        if (inputFile.size() >= 2 && inputFile.substr(inputFile.size() - 2) == ".c") {
-            // C源文件 - 使用Clang前端
-            analyzeCFile(inputFile);
-        } else {
-            utils::Logger::warning("Unsupported file type");
-            utils::Logger::info("Currently only .c files are supported");
-            utils::Logger::info("Use --demo flag to run the demo analysis");
-            runDemoAnalysis();
-        }
+        utils::Logger::warning("C file parsing not yet implemented");
+        utils::Logger::info("Clang frontend requires complex library linking configuration");
+        utils::Logger::info("Use --demo flag to run the demo analysis");
+        runDemoAnalysis();
     }
 
     utils::Logger::info("CVerifier completed");
