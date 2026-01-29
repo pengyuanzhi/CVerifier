@@ -5,10 +5,13 @@
 
 #include "cverifier/LibClangParser.h"
 #include "cverifier/LLIRFactory.h"
+#include "cverifier/LLIRModule.h"
 #include "cverifier/Utils.h"
 #include <iostream>
 
 #ifdef HAVE_LLVM
+
+using namespace cverifier::core;
 
 namespace cverifier {
 namespace frontend {
@@ -122,22 +125,30 @@ void LibClangParser::traverseAST(CXTranslationUnit tu, LLIRModule* module) {
         return;
     }
 
-    // �始化访问
+    // 初始化访问
     CXCursor cursor = clang_getTranslationUnitCursor(tu);
 
     utils::Logger::debug("Traversing AST...");
+
+    // 创建一个结构体来传递 parser 和 module
+    struct ClientData {
+        LibClangParser* parser;
+        LLIRModule* module;
+    };
+    ClientData data = {this, module};
 
     // 递归遍历所有子节点
     clang_visitChildren(
         cursor,
         [](CXCursor c, CXCursor parent, CXClientData client_data) {
-            LibClangParser* parser = static_cast<LibClangParser*>(client_data);
-            if (parser) {
-                parser->processCursor(c, static_cast<LLIRModule*>(client_data));
+            ClientData* data = static_cast<ClientData*>(client_data);
+            if (data && data->parser) {
+                data->parser->processCursor(c, data->module);
             }
+            (void)parent;  // 避免未使用参数警告
             return CXChildVisit_Continue;
         },
-        this
+        &data
     );
 }
 
@@ -223,10 +234,14 @@ ValueType LibClangParser::getType(CXType type) {
             return ValueType::Float;
         case CXType_Pointer:
             return ValueType::Pointer;
-        case CXType_Array:
-            return ValueType::Array;
+        // CXType_Array 可能在某些版本的 libclang 中不存在
+        // case CXType_Array:
+        //     return ValueType::Array;
+        case CXType_Record:
+            return ValueType::Struct;
         default:
-            return ValueType::Unknown;
+            // 对于未知类型，默认使用整数类型
+            return ValueType::Integer;
     }
 }
 
