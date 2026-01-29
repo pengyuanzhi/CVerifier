@@ -90,13 +90,29 @@ if(LLVM_FOUND)
             ${LLVM_LIBS}
         )
 
-        # 尝试链接 Clang 库（如果可用）
-        # 注意：Clang 库名在不同平台可能不同
-        foreach(clang_lib clangFrontend clangTooling clangAST clangBasic clangCodeGen)
-            if(TARGET ${clang_lib})
-                target_link_libraries(cverifier-frontend PUBLIC ${clang_lib})
+        # 链接 Clang 库
+        # 使用 LLVM_CONFIG_FOUND 检查是否可以通过 llvm-config 获取 Clang 库
+        find_program(LLVM_CONFIG llvm-config PATHS "${LLVM_TOOLS_BINARY_DIR}" "${LLVM_BUILD_UTILS_DIR}")
+        if(LLVM_CONFIG)
+            # 尝试获取 Clang 库
+            execute_process(
+                COMMAND ${LLVM_CONFIG} --libs clangFrontend clangTooling clangAST clangBasic clangCodeGen
+                OUTPUT_VARIABLE CLANG_LIBS_OUTPUT
+                OUTPUT_STRIP_TRAILING_WHITESPACE
+                ERROR_QUIET
+            )
+
+            if(CLANG_LIBS_OUTPUT)
+                # 分割库列表
+                separate_arguments(CLANG_LIBS_OUTPUT)
+                target_link_libraries(cverifier-frontend PUBLIC ${CLANG_LIBS_OUTPUT})
+                message(STATUS "Clang libraries linked: ${CLANG_LIBS_OUTPUT}")
+            else()
+                message(WARNING "Could not get Clang libraries from llvm-config")
             endif()
-        endforeach()
+        else()
+            message(WARNING "llvm-config not found, Clang frontend may not work properly")
+        endif()
 
         target_include_directories(cverifier-frontend PUBLIC
             ${CMAKE_SOURCE_DIR}/include
