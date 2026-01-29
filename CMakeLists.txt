@@ -251,37 +251,36 @@ endif()
 # ============================================================================
 # Clang前端测试程序
 # ============================================================================
-# 注意：Clang 前端集成需要额外的配置，暂时禁用
-# if(LLVM_FOUND AND EXISTS ${CMAKE_SOURCE_DIR}/tools/test_clang.cpp)
-#     add_executable(test_clang
-#         tools/test_clang.cpp
-#     )
-#
-#     target_link_libraries(test_clang PRIVATE
-#         cverifier-core
-#         cverifier-analyzer
-#         cverifier-frontend
-#     )
-#
-#     if(Z3_FOUND)
-#         target_link_libraries(test_clang PRIVATE ${Z3_LIBRARIES})
-#         target_compile_definitions(test_clang PRIVATE HAVE_Z3)
-#         target_include_directories(test_clang PRIVATE ${Z3_INCLUDE_DIRS})
-#     endif()
-#
-#     # Clang 库已经通过 cverifier-frontend 传递链接
-#     # 这里只需要确保 LLVM 库被正确链接
-#     target_link_libraries(test_clang PRIVATE
-#         ${LLVM_LIBS}
-#     )
-#
-#     target_compile_definitions(test_clang PRIVATE HAVE_LLVM)
-#
-#     target_include_directories(test_clang PRIVATE
-#         ${CMAKE_SOURCE_DIR}/include
-#         ${LLVM_INCLUDE_DIRS}
-#     )
-# endif()
+if(LLVM_FOUND AND EXISTS ${CMAKE_SOURCE_DIR}/tools/test_clang.cpp)
+    add_executable(test_clang
+        tools/test_clang.cpp
+    )
+
+    target_link_libraries(test_clang PRIVATE
+        cverifier-core
+        cverifier-analyzer
+        cverifier-frontend
+    )
+
+    if(Z3_FOUND)
+        target_link_libraries(test_clang PRIVATE ${Z3_LIBRARIES})
+        target_compile_definitions(test_clang PRIVATE HAVE_Z3)
+        target_include_directories(test_clang PRIVATE ${Z3_INCLUDE_DIRS})
+    endif()
+
+    # Clang 库已经通过 cverifier-frontend 传递链接
+    # 这里只需要确保 LLVM 库被正确链接
+    target_link_libraries(test_clang PRIVATE
+        ${LLVM_LIBS}
+    )
+
+    target_compile_definitions(test_clang PRIVATE HAVE_LLVM)
+
+    target_include_directories(test_clang PRIVATE
+        ${CMAKE_SOURCE_DIR}/include
+        ${LLVM_INCLUDE_DIRS}
+    )
+endif()
 
 # ============================================================================
 # 抽象解释测试程序
