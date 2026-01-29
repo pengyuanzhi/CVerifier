@@ -389,9 +389,10 @@ if(CMAKE_CXX_COMPILER_ID MATCHES "GNU|Clang")
     target_compile_options(cverifier-core PRIVATE
         -Wall -Wextra -Wpedantic
     )
-    target_compile_options(cverifier-frontend PRIVATE
-        -Wall -Wextra -Wpedantic
-    )
+    # cverifier-frontend 已禁用
+    # target_compile_options(cverifier-frontend PRIVATE
+    #     -Wall -Wextra -Wpedantic
+    # )
     target_compile_options(cverifier-analyzer PRIVATE
         -Wall -Wextra -Wpedantic
     )
@@ -399,9 +400,10 @@ elseif(MSVC)
     target_compile_options(cverifier-core PRIVATE
         /W4
     )
-    target_compile_options(cverifier-frontend PRIVATE
-        /W4
-    )
+    # cverifier-frontend 已禁用
+    # target_compile_options(cverifier-frontend PRIVATE
+    #     /W4
+    # )
     target_compile_options(cverifier-analyzer PRIVATE
         /W4
     )
