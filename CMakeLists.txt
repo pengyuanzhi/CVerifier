@@ -76,97 +76,68 @@ if(Z3_FOUND)
 endif()
 
 # ============================================================================
-# 前端库（仅在找到LLVM时构建）
+# 前端库（使用 libclang C API）
 # ============================================================================
-# 注意：Clang 前端集成需要复杂的 Clang 库链接配置
-# 暂时禁用，等待后续完善
-# if(LLVM_FOUND)
-#     if(EXISTS ${CMAKE_SOURCE_DIR}/src/frontend/clang/ClangParser.cpp)
-#         add_library(cverifier-frontend
-#             src/frontend/clang/ClangParser.cpp
-#         )
-#
-#         # 链接核心库
-#         target_link_libraries(cverifier-frontend PUBLIC
-#             cverifier-core
-#         )
-#
-#         # 链接 LLVM 库（使用 LLVM 提供的库列表）
-#         if(TARGET LLVM)
-#             target_link_libraries(cverifier-frontend PUBLIC LLVM)
-#         else()
-#             target_link_libraries(cverifier-frontend PUBLIC ${LLVM_LIBS})
-#         endif()
-#
-#         # 查找并链接 Clang 库
-#         # 尝试使用 find_package 查找 Clang
-#         find_package(Clang QUIET CONFIG)
-#
-#         if(Clang_FOUND)
-#             message(STATUS "Found Clang ${Clang_VERSION}")
-#
-#             # 链接所有必需的 Clang 库
-#             target_link_libraries(cverifier-frontend PUBLIC
-#                 clangAST
-#                 clangBasic
-#                 clangFrontend
-#                 clangLex
-#                 clangTooling
-#                 clangToolingCore
-#             )
-#
-#             # 添加 Clang 包含目录
-#             if(CLANG_INCLUDE_DIRS)
-#                 target_include_directories(cverifier-frontend PUBLIC ${CLANG_INCLUDE_DIRS})
-#             endif()
-#
-#             message(STATUS "Clang libraries linked successfully")
-#         else()
-#             # 如果 find_package(Clang) 失败，尝试手动查找库
-#             message(WARNING "Clang CONFIG not found, trying manual library detection")
-#
-#             # 常见的 Clang 库路径
-#             find_library(CLANG_FRONTEND_LIB NAMES clangFrontend PATHS ${LLVM_LIBRARY_DIR})
-#             find_library(CLANG_TOOLING_LIB NAMES clangTooling PATHS ${LLVM_LIBRARY_DIR})
-#             find_library(CLANG_AST_LIB NAMES clangAST PATHS ${LLVM_LIBRARY_DIR})
-#             find_library(CLANG_BASIC_LIB NAMES clangBasic PATHS ${LLVM_LIBRARY_DIR})
-#             find_library(CLANG_LEX_LIB NAMES clangLex PATHS ${LLVM_LIBRARY_DIR})
-#             find_library(CLANG_TOOLINGCORE_LIB NAMES clangToolingCore PATHS ${LLVM_LIBRARY_DIR})
-#
-#             if(CLANG_FRONTEND_LIB AND CLANG_TOOLING_LIB AND CLANG_AST_LIB AND CLANG_BASIC_LIB)
-#                 target_link_libraries(cverifier-frontend PUBLIC
-#                     ${CLANG_FRONTEND_LIB}
-#                     ${CLANG_TOOLING_LIB}
-#                     ${CLANG_AST_LIB}
-#                     ${CLANG_BASIC_LIB}
-#                     ${CLANG_LEX_LIB}
-#                     ${CLANG_TOOLINGCORE_LIB}
-#                 )
-#                 message(STATUS "Clang libraries linked (manual detection)")
-#             else()
-#                 message(WARNING "Could not find all required Clang libraries")
-#                 message(STATUS "  clangFrontend: ${CLANG_FRONTEND_LIB}")
-#                 message(STATUS "  clangTooling: ${CLANG_TOOLING_LIB}")
-#                 message(STATUS "  clangAST: ${CLANG_AST_LIB}")
-#                 message(STATUS "  clangBasic: ${CLANG_BASIC_LIB}")
-#             endif()
-#         endif()
-#
-#         target_include_directories(cverifier-frontend PUBLIC
-#             ${CMAKE_SOURCE_DIR}/include
-#             ${LLVM_INCLUDE_DIRS}
-#         )
-#
-#         target_compile_definitions(cverifier-frontend PUBLIC HAVE_LLVM)
-#
-#         # 添加 Clang 所需的编译定义
-#         if(Clang_FOUND OR CLANG_BASIC_LIB)
-#             target_compile_definitions(cverifier-frontend PUBLIC
-#                 HAVE_CLANG
-#             )
-#         endif()
-#     endif()
-# endif()
+if(LLVM_FOUND)
+    if(EXISTS ${CMAKE_SOURCE_DIR}/src/frontend/libclang/LibClangParser.cpp)
+        add_library(cverifier-frontend
+            src/frontend/libclang/LibClangParser.cpp
+        )
+
+        # 链接核心库
+        target_link_libraries(cverifier-frontend PUBLIC
+            cverifier-core
+        )
+
+        # 链接 LLVM 库
+        if(TARGET LLVM)
+            target_link_libraries(cverifier-frontend PUBLIC LLVM)
+        else()
+            target_link_libraries(cverifier-frontend PUBLIC ${LLVM_LIBS})
+        endif()
+
+        # 查找 libclang
+        find_library(LIBCLANG_LIB NAMES clang libclang PATHS
+            /usr/lib
+            /usr/local/lib
+            /usr/lib/llvm*/lib
+            "C:/Program Files/LLVM/lib"
+            ${LLVM_LIBRARY_DIR}
+        )
+
+        if(LIBCLANG_LIB)
+            message(STATUS "Found libclang: ${LIBCLANG_LIB}")
+            target_link_libraries(cverifier-frontend PUBLIC ${LIBCLANG_LIB})
+
+            # 获取 libclang 的包含目录
+            get_filename_component(LIBCLANG_DIR ${LIBCLANG_LIB} DIRECTORY)
+            find_path(LIBCLANG_INCLUDE_DIR
+                NAMES clang-c/Index.h
+                PATHS
+                /usr/include
+                /usr/local/include
+                /usr/lib/llvm*/include
+                "C:/Program Files/LLVM/include"
+                ${LIBCLANG_DIR}/../include
+                ${LLVM_INCLUDE_DIRS}
+            )
+
+            if(LIBCLANG_INCLUDE_DIR)
+                message(STATUS "Found libclang headers: ${LIBCLANG_INCLUDE_DIR}")
+                target_include_directories(cverifier-frontend PUBLIC ${LIBCLANG_INCLUDE_DIR})
+            endif()
+        else()
+            message(WARNING "libclang not found. Frontend will be disabled.")
+        endif()
+
+        target_include_directories(cverifier-frontend PUBLIC
+            ${CMAKE_SOURCE_DIR}/include
+            ${LLVM_INCLUDE_DIRS}
+        )
+
+        target_compile_definitions(cverifier-frontend PUBLIC HAVE_LLVM)
+    endif()
+endif()
 
 # ============================================================================
 # 分析器库
@@ -389,10 +360,11 @@ if(CMAKE_CXX_COMPILER_ID MATCHES "GNU|Clang")
     target_compile_options(cverifier-core PRIVATE
         -Wall -Wextra -Wpedantic
     )
-    # cverifier-frontend 已禁用
-    # target_compile_options(cverifier-frontend PRIVATE
-    #     -Wall -Wextra -Wpedantic
-    # )
+    if(TARGET cverifier-frontend)
+        target_compile_options(cverifier-frontend PRIVATE
+            -Wall -Wextra -Wpedantic
+        )
+    endif()
     target_compile_options(cverifier-analyzer PRIVATE
         -Wall -Wextra -Wpedantic
     )
@@ -400,10 +372,11 @@ elseif(MSVC)
     target_compile_options(cverifier-core PRIVATE
         /W4
     )
-    # cverifier-frontend 已禁用
-    # target_compile_options(cverifier-frontend PRIVATE
-    #     /W4
-    # )
+    if(TARGET cverifier-frontend)
+        target_compile_options(cverifier-frontend PRIVATE
+            /W4
+        )
+    endif()
     target_compile_options(cverifier-analyzer PRIVATE
         /W4
     )
