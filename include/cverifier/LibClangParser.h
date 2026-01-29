@@ -1,7 +1,6 @@
 #ifndef CVERIFIER_LIBCLANG_PARSER_H
 #define CVERIFIER_LIBCLANG_PARSER_H
 
-#include "cverifier/LLIRModule.h"
 #include "cverifier/Core.h"
 #include <string>
 #include <vector>
@@ -12,6 +11,12 @@
 #include <clang-c/Index.h>
 
 namespace cverifier {
+
+// 前向声明
+namespace core {
+class LLIRModule;
+}
+
 namespace frontend {
 
 /**
@@ -30,7 +35,7 @@ public:
      * @param filename 源文件路径
      * @return LLIR 模块，失败返回 nullptr
      */
-    LLIRModule* parseFile(const std::string& filename);
+    core::LLIRModule* parseFile(const std::string& filename);
 
     /**
      * @brief 获取最后的错误信息
@@ -46,17 +51,17 @@ private:
     /**
      * @brief 遍历 AST 并生成 LLIR
      */
-    void traverseAST(CXTranslationUnit tu, LLIRModule* module);
+    void traverseAST(CXTranslationUnit tu, core::LLIRModule* module);
 
     /**
      * @brief 处理光标
      */
-    void processCursor(CXCursor cursor, LLIRModule* module);
+    void processCursor(CXCursor cursor, core::LLIRModule* module);
 
     /**
      * @brief 处理函数声明
      */
-    void processFunctionDecl(CXCursor cursor, LLIRModule* module);
+    void processFunctionDecl(CXCursor cursor, core::LLIRModule* module);
 
     /**
      * @brief 获取光标对应的类型
